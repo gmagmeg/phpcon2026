@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-<title>OPcache・JIT が効くコード/効かないコード</title>
+<title>JIT と OPcache を「正しく」期待する ― PHP 高速化の効きどころ</title>
 
 <link rel="stylesheet" href="dist/reveal.css">
 <link rel="stylesheet" href="dist/theme/white.css">
@@ -20,11 +20,17 @@
 <div class="reveal">
 	<div class="slides">
 
-		<!-- ===== タイトルスライド ===== -->
-		<!-- 全面背景画像にする場合: data-background-image="images/cover.png" data-background-size="cover" -->
+		<!-- ===== タイトル ===== -->
 		<section class="title-slide" data-background-color="#0b1f3a">
-			<h1>プレゼンのタイトル<br>サブタイトル</h1>
-			<p class="small">発表者名 / イベント名 / 2026-01-01</p>
+			<h1>JIT と OPcache を<br>「正しく」期待する</h1>
+			<p class="small">― PHP 高速化の効きどころ ―</p>
+			<p class="small">ma_me / PHP Conference Japan 2026</p>
+		</section>
+
+		<!-- ===== 一行テーマ ===== -->
+		<section class="center-punch">
+			<p>「JIT を入れれば速くなる」は半分しか正しくない。</p>
+			<p class="answer">何が速くなり、何が速くならないのかを<br>計測で見極める。</p>
 		</section>
 
 		<!-- ===== 目次（h2 から自動生成） ===== -->
@@ -33,150 +39,447 @@
 			<ol id="toc-list"></ol>
 		</section>
 
-		<!-- ===== 通常スライド（見出し + 本文 + 図） ===== -->
-		<section>
-			<h2>見出し</h2>
-			<p>本文テキスト。強調は太字ではなく <span class="key">色（.key）</span> を使う。</p>
-			<figure class="slide-figure">
-				<img src="images/sample.png" alt="説明">
-				<figcaption>図のキャプション</figcaption>
-			</figure>
+		<!-- ============================================================ -->
+		<!-- 第1章 イントロ / 前提合わせ -->
+		<!-- ============================================================ -->
+		<section class="section-divider">
+			<h1>1. イントロ / 前提合わせ</h1>
 		</section>
 
-		<!-- ===== ゴール / 箇条書きスライド ===== -->
 		<section class="goal-slide">
 			<h2>このセッションのゴール</h2>
 			<ul class="emph-middle-list">
-				<li>ポイント その1</li>
-				<li>ポイント その2</li>
-				<li>ポイント その3</li>
+				<li>JIT / OPcache がそれぞれ<span class="key">「どこに効くのか」</span>を、雰囲気ではなく計測で理解する</li>
+				<li><span class="key">「JIT 入れたのに速くならない」</span>の正体を理解して帰ってもらう</li>
 			</ul>
 		</section>
 
-		<!-- ============================================================ -->
-		<!-- ===== OPcache・JIT のしくみ（説明スライド） ===== -->
-		<!-- ============================================================ -->
-
-		<!-- 章区切り -->
-		<section class="section-divider">
-			<h1>OPcache と JIT のしくみ</h1>
+		<section>
+			<h2>PHP 実行の流れ</h2>
+			<p class="emph-1_2x" style="margin:.6em 0">PHP ソース <span class="key">→</span> 字句 / 構文解析 <span class="key">→</span> OPCODE（中間表現）<span class="key">→</span> Zend VM が実行</p>
+			<ul class="emph-middle-list">
+				<li><span class="key">OPcache</span> … 「ソース → OPCODE」の変換結果をキャッシュ＝<span class="key">コンパイル段階</span>に効く</li>
+				<li><span class="key">JIT</span> … OPCODE の<span class="key">実行段階</span>を速くする</li>
+			</ul>
 		</section>
 
-		<!-- OPcache とは（概要） -->
 		<section>
 			<h2>OPcache とは</h2>
 			<ul class="emph-middle-list">
-				<li>PHP は毎リクエスト、コードを <span class="key">Opcode（中間命令）</span>へコンパイルしている</li>
+				<li>PHP は毎リクエスト、コードを <span class="key">OPCODE（中間命令）</span>へコンパイルしている</li>
 				<li>OPcache はそのコンパイル結果をメモリにキャッシュして使い回す</li>
-				<li>コンパイルのムダを省く。ほぼ全アプリに効くので <span class="key">基本は常に有効</span></li>
+				<li>＝<span class="key">コンパイルコストの削減</span>がメイン。実行そのものを速くするわけではない</li>
 			</ul>
 		</section>
 
-		<!-- JIT とは（概要） -->
 		<section>
-			<h2>JIT とは</h2>
+			<h2>JIT とは（PHP 8.0+）</h2>
 			<ul class="emph-middle-list">
-				<li>通常 Opcode は Zend VM が <span class="key">1 命令ずつ解釈実行</span>している</li>
-				<li>JIT は Opcode を実行時に <span class="key">ネイティブ機械語</span>へ変換し CPU で直接実行（PHP 8.0〜）</li>
-				<li>OPcache の上で動く＝OPcache が無効なら JIT も効かない</li>
+				<li>通常 OPCODE は Zend VM が <span class="key">1 命令ずつ解釈実行</span>している</li>
+				<li>JIT は OPCODE を実行時に <span class="key">ネイティブ機械語</span>へ変換し CPU で直接実行</li>
+				<li>OPcache の上で動く＝<span class="key">OPcache が無効なら JIT も効かない</span></li>
 			</ul>
 		</section>
 
-		<!-- つなぎ -->
 		<section class="lead-bridge">
-			<p>では実際に、<span class="key">効くコードと効かないコード</span>を<br>作って測って確かめてみよう。</p>
+			<p>OPcache・JIT を入れると<span class="key">どこまで速くなるのか</span>。<br>作って・測って・確かめてみよう。</p>
 		</section>
 
-		<!-- ===== パンチライン（結論を大きく） ===== -->
-		<section class="center-punch">
-			<p>つなぎの一文</p>
-			<p class="answer">結論のキーワード</p>
-		</section>
-
-		<!-- ===== 章区切り ===== -->
+		<!-- ============================================================ -->
+		<!-- 第2章 OPcache が効くケース -->
+		<!-- ============================================================ -->
 		<section class="section-divider">
-			<h1>第2章 タイトル</h1>
+			<h1>2. OPcache が効くケース</h1>
 		</section>
 
-		<!-- ===== 章つなぎ（本文大きめ） ===== -->
-		<section class="lead-bridge">
-			<p>次のテーマへの橋渡しとなる説明文。</p>
-		</section>
-
-		<!-- ===== 2カラム（左テキスト・右画像） ===== -->
 		<section>
-			<h2>2カラムレイアウト</h2>
-			<div class="text-image-row">
-				<div class="ti-text">
-					<ul>
-						<li>左に説明</li>
-						<li>右に図</li>
-					</ul>
-				</div>
-				<div class="ti-image">
-					<img src="images/sample.png" alt="図" style="max-width: 100%">
-				</div>
+			<h2>OPcache の効果はコード量に比例</h2>
+			<p>効果は <span class="key">コード量（コンパイル対象の規模）にほぼ比例</span>する。</p>
+			<div class="checklist">
+				<p class="ng"><span class="mark">▽</span>薄い自作スクリプト … コンパイルコストが元々小さい → 効果も薄い</p>
+				<p class="ok"><span class="mark">△</span>大量のクラス / ファイルを読む … 省略が積み上がる → 大きい</p>
 			</div>
 		</section>
 
-		<!-- ===== 横並び比較 ===== -->
 		<section>
-			<h2>Before / After</h2>
-			<div class="compare-row">
-				<figure class="slide-figure">
-					<figcaption>Before</figcaption>
-					<img src="images/before.png" alt="before">
-				</figure>
-				<figure class="slide-figure">
-					<figcaption>After</figcaption>
-					<img src="images/after.png" alt="after">
-				</figure>
-			</div>
+			<h2>一番効く例：Laravel（フレームワーク）</h2>
+			<p>Laravel の初期 Welcome ページを OPcache OFF / ON で別プロセス <span class="key">30 回起動</span>して比較（1 リクエストのブート時間）。</p>
+			<table class="compare-table">
+				<thead>
+					<tr><th>構成</th><th>1 リクエストのブート</th><th>比</th></tr>
+				</thead>
+				<tbody>
+					<tr><td>OPcache OFF</td><td>146.89 ms</td><td>1.0×（基準）</td></tr>
+					<tr class="highlight"><td>OPcache ON</td><td>71.89 ms</td><td>約 2.04× 速い（約 75ms 短縮）</td></tr>
+				</tbody>
+			</table>
+			<p class="small muted">実測 / Docker・PHP 8.5。計測コード: <code>bench/laravel_request.php</code> / <code>bench/laravel_boot_bench.sh</code></p>
 		</section>
 
-		<!-- ===== コードブロック ===== -->
 		<section>
-			<h2>コード例</h2>
-			<pre><code data-trim data-noescape class="language-php">
-header('Link: &lt;/app.css&gt;; rel=preload; as=style', false);
-header('Link: &lt;/app.js&gt;; rel=preload; as=script', false);
-http_response_code(103);
+			<h2>逆効果パターン：薄いスクリプトの寄せ集め</h2>
+			<p>関数 1 個だけの極小ファイルを N 個 require するだけ。やっていることはこれだけ：</p>
+			<pre style="font-size:.52em"><code data-trim data-noescape class="language-php">
+// ① 関数1個だけの極小ファイルを N 個生成
+for ($i = 0; $i &lt; $n; $i++) {
+    file_put_contents("thin_{$i}.php", "&lt;?php function thin_fn_{$i}(\$x){ return \$x + {$i}; }");
+}
+// ② それを require するだけ＝「薄いスクリプトの寄せ集め」
+$t0 = hrtime(true);
+for ($i = 0; $i &lt; $n; $i++) {
+    require "thin_{$i}.php";   // OFF: 毎回コンパイル / ON: file_cache から読むだけ
+}
+echo (hrtime(true) - $t0) / 1e6, " ms\n";
 			</code></pre>
 		</section>
 
-		<!-- ===== テーブル / 比較表 ===== -->
 		<section>
-			<h2>比較表</h2>
+			<h2>薄いスクリプト：ON でも速くならない</h2>
 			<table class="compare-table">
 				<thead>
-					<tr><th>項目</th><th>A</th><th>B</th></tr>
+					<tr><th>require ファイル数</th><th>OPcache OFF</th><th>OPcache ON</th><th>比</th></tr>
 				</thead>
 				<tbody>
-					<tr><td>速度</td><td>普通</td><td>速い</td></tr>
-					<tr class="highlight"><td>採用</td><td>—</td><td>◯</td></tr>
+					<tr class="highlight"><td>1 個（＝薄いスクリプト）</td><td>0.030 ms</td><td>0.036 ms</td><td>0.83×（速くならない）</td></tr>
+					<tr><td>50 個</td><td>0.199 ms</td><td>0.243 ms</td><td>0.82×</td></tr>
+					<tr><td>500 個</td><td>1.636 ms</td><td>1.891 ms</td><td>0.87×</td></tr>
+				</tbody>
+			</table>
+			<ul>
+				<li>どの行も ON は速くならない。むしろ僅かに遅い</li>
+				<li>キャッシュから読むオーバーヘッドが、薄いコードをそのまま読むコストを上回った</li>
+				<li class="muted small">効くのはファイル「数」ではなくコンパイル「総量」（＝コード量）</li>
+			</ul>
+		</section>
+
+		<section class="center-punch">
+			<p>OPcache は「実行」ではなく<span class="key">「毎回のコンパイル」</span>を省く。</p>
+			<p class="answer">コード量が多いフレームワークが<br>最大の受益者。</p>
+		</section>
+
+		<!-- ============================================================ -->
+		<!-- 第3章 計測の枠組み -->
+		<!-- ============================================================ -->
+		<section class="section-divider">
+			<h1>3. 計測の枠組み</h1>
+		</section>
+
+		<section>
+			<h2>計測の枠組み</h2>
+			<ul class="emph-middle-list">
+				<li>ツール：<span class="key">PHPBench</span>（<code>@Revs</code>＝内側ループ回数 / <code>@Iterations</code>＝反復）</li>
+				<li>比較軸：<span class="key">JIT OFF vs ON</span>、さらに <span class="key">mode（function vs tracing）</span></li>
+				<li>原則：JIT が速くするのは <span class="key">OPCODE の実行部分</span>。標準関数や IO の中身（ネイティブ C）は速くできない</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>3-1. 最大の落とし穴：JIT が動いていない</h2>
+			<ul class="emph-middle-list">
+				<li>PHP 8 以降 <code>opcache.jit</code> の既定は <code>tracing</code> … だが <span class="key"><code>opcache.jit_buffer_size</code> の既定が <code>0</code></span></li>
+				<li>バッファが 0 だと mode を何にしても <span class="key">JIT は動かない</span></li>
+				<li>CLI（PHPBench）は <code>opcache.enable_cli=1</code> が別途必要（FPM とは別 ini）</li>
+			</ul>
+			<pre style="font-size:.6em"><code data-trim data-noescape class="language-ini">
+opcache.enable=1
+opcache.enable_cli=1
+opcache.jit=tracing
+opcache.jit_buffer_size=128M   ; ← これを明示しないと JIT は無効
+			</code></pre>
+		</section>
+
+		<section>
+			<h2>3-1. <code>opcache.jit</code> は 4 桁 <code>CRTO</code></h2>
+			<table class="compare-table">
+				<thead><tr><th>桁</th><th>意味</th><th>主な値</th></tr></thead>
+				<tbody>
+					<tr><td>C (CPU)</td><td>CPU 固有最適化</td><td>0=なし / 1=AVX</td></tr>
+					<tr><td>R (Register)</td><td>レジスタ割り付け</td><td>0=なし / 1=局所 / 2=全域</td></tr>
+					<tr class="highlight"><td>T (Trigger)</td><td>いつ compile するか</td><td>0=ロード時 / 1=初回 / 3=ホット関数 / 5=トレーシング</td></tr>
+					<tr><td>O (Optimization)</td><td>最適化レベル</td><td>1=最小 … 5=手続き内解析</td></tr>
+				</tbody>
+			</table>
+			<p><code>function</code>＝<code>1205</code>（T=0）/ <code>tracing</code>＝<code>1254</code>（T=5）。<span class="key">本質は第 3 桁（トリガ）の違い</span>だけ。</p>
+		</section>
+
+		<section>
+			<h2>3-2. function JIT と tracing JIT</h2>
+			<div class="columns">
+				<div class="col">
+					<h3>function（T=0）</h3>
+					<ul>
+						<li>関数を<span class="key">まるごと</span>機械語化</li>
+						<li>ホットかどうかに関係なく対象</li>
+						<li>ウォームアップ<span class="key">不要</span></li>
+					</ul>
+				</div>
+				<div class="col">
+					<h3>tracing（T=5）</h3>
+					<ul>
+						<li>ホットな<span class="key">実行経路（trace）</span>だけ compile</li>
+						<li>関数境界を越えて<span class="key">インライン化</span>・実型で特殊化</li>
+						<li>ウォームアップ<span class="key">必要</span></li>
+					</ul>
+				</div>
+			</div>
+		</section>
+
+		<section>
+			<h2>3-2. どちらを選ぶか（損益分岐）</h2>
+			<table class="compare-table">
+				<thead><tr><th>観点</th><th>function (T=0)</th><th>tracing (T=5)</th></tr></thead>
+				<tbody>
+					<tr><td>compile タイミング</td><td>ロード時に全関数</td><td>実行を観測しホットな trace を後から</td></tr>
+					<tr><td>ウォームアップ</td><td>不要（最初から効く）</td><td>必要（検出までは素の VM）</td></tr>
+					<tr><td>最適化の質</td><td>関数単位どまり</td><td>境界を越えて特殊化</td></tr>
+					<tr class="highlight"><td>得意</td><td>起動直後・短命処理</td><td>ホットループ・常駐ワーカー</td></tr>
+				</tbody>
+			</table>
+			<p class="small muted">短命 CLI・1 回こっきりの処理では tracing の warmup を回収できない。「常に tracing が最速」ではない。</p>
+		</section>
+
+		<!-- ============================================================ -->
+		<!-- 第4章 JIT はどこで効くのか -->
+		<!-- ============================================================ -->
+		<section class="section-divider">
+			<h1>4. JIT はどこで効くのか</h1>
+		</section>
+
+		<section>
+			<h2>4-1. ケース①：四則演算 / bcmath</h2>
+			<ul class="emph-middle-list">
+				<li>四則演算・ループ・文字連結 ＝ <span class="key">OPCODE そのもの</span>（<code>ADD</code> / <code>MUL</code> …）→ JIT がネイティブ命令に</li>
+				<li>ネイティブ float 演算は JIT ON で<span class="key">大きく改善</span>（OPCODE が支配的）</li>
+				<li>bcmath は内部 C 実装 → <span class="key">JIT の恩恵は限定的</span></li>
+			</ul>
+			<p style="margin-top:.4em;text-align:center"><span class="key emph-1_2x">計算が OPCODE で表現される処理ほど JIT が効く</span></p>
+		</section>
+
+		<section>
+			<h2>4-2. ケース②：コールバックを取る標準関数</h2>
+			<ul class="emph-middle-list">
+				<li>標準関数でも、<span class="key">コールバック部分はユーザー定義 ＝ OPCODE</span>が発生</li>
+				<li><code>array_map</code> / <code>usort</code> … 中身のループは C だが、各要素のクロージャは <span class="key">JIT 対象</span></li>
+				<li>コールバックの処理が重いほど JIT の効果が見える</li>
+			</ul>
+			<p class="muted">教訓：標準関数でも「ユーザーコードを実行する隙間」があれば JIT は効く。</p>
+		</section>
+
+		<section>
+			<h2>4-3. ケース③：もう一つの JIT ＝ PCRE JIT</h2>
+			<ul class="emph-middle-list">
+				<li>PHP の JIT とは<span class="key">別系統</span>、PCRE ライブラリ自身が持つ JIT（<code>pcre.jit</code>）</li>
+				<li>正規表現エンジンが内部でパターンを機械語化する仕組み</li>
+				<li>計測は PCRE JIT ON / OFF で比較</li>
+			</ul>
+			<p class="muted">「JIT」と一口に言っても複数あり、<span class="key">効くレイヤーが違う</span>。混同しないこと。</p>
+		</section>
+
+		<!-- 4-4 実践（核） -->
+		<section class="lead-bridge">
+			<p>ここからが実践的な核。<br><span class="key">型付きの値オブジェクトで計算を表現する層</span>に JIT が効く。</p>
+		</section>
+
+		<section>
+			<h2>4-4. 題材：<code>Money</code> 値オブジェクト</h2>
+			<div class="columns">
+				<div class="col">
+					<p class="small">型付き（<code>readonly</code> + 型宣言）</p>
+					<pre style="font-size:.46em"><code data-trim data-noescape class="language-php">
+final class Money
+{
+    public function __construct(
+        private readonly int $amount
+    ) {}
+
+    public function add(Money $o): self
+    { return new self($this->amount + $o->amount); }
+
+    public function multiply(int $f): self
+    { return new self($this->amount * $f); }
+}
+					</code></pre>
+				</div>
+				<div class="col">
+					<p class="small">型なし（型宣言を外しただけ）</p>
+					<pre style="font-size:.46em"><code data-trim data-noescape class="language-php">
+final class MoneyLoose
+{
+    private $amount;
+    public function __construct($amount)
+    { $this->amount = $amount; }
+
+    public function add($o)
+    { return new self($this->amount + $o->amount); }
+
+    public function multiply($f)
+    { return new self($this->amount * $f); }
+}
+					</code></pre>
+				</div>
+			</div>
+		</section>
+
+		<section>
+			<h2>4-4. 計測マトリクス（tracing JIT）</h2>
+			<table class="compare-table">
+				<thead><tr><th>水準</th><th>内容</th><th>JIT ON での読み筋</th></tr></thead>
+				<tbody>
+					<tr><td>A: 生スカラー演算</td><td><code>$sum + $a; $sum * 2;</code> をループ</td><td>大きく改善（上限の目安）</td></tr>
+					<tr class="highlight"><td>B: 型付き Money</td><td><code>add</code> / <code>multiply</code> をループ</td><td>大きく改善し A に肉薄</td></tr>
+					<tr><td>C: 型なし MoneyLoose</td><td>B と同等処理</td><td>改善は鈍い（型ガードが残る）</td></tr>
+				</tbody>
+			</table>
+			<ul class="small">
+				<li>JIT ON で <span class="key">B（型付き）が A に肉薄</span>：型が静的に分かり、メソッドをインライン化・プロパティを直接アクセス・<code>int</code> 演算に特殊化</li>
+				<li>C（型なし）は型不明ゆえガード・汎用パスが残り改善が鈍い</li>
+			</ul>
+		</section>
+
+		<section class="center-punch">
+			<p>B と C の差（＝<span class="key">型を付けたかどうか</span>）が JIT ON で開く。</p>
+			<p class="answer">設計上の正しさ（型安全）が、<br>そのまま JIT の効きに直結する。</p>
+		</section>
+
+		<section>
+			<h2>4-4. 補足（誠実に / 質疑対策）</h2>
+			<ul class="emph-middle-list">
+				<li>イミュータブルは毎演算で <code>new</code> → <span class="key">アロケーション / GC コストは JIT でも消えない</span>。A には完全一致しない</li>
+				<li>効くのは <span class="key">tracing JIT ＋ ホットループ</span>が前提。単発呼び出しでは出ない</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>4-4. 代入の計測（コンストラクタ代入）</h2>
+			<pre style="font-size:.52em"><code data-trim data-noescape class="language-php">
+final class TypedPoint {
+    public function __construct(
+        private readonly int $x,
+        private readonly int $y,
+    ) {}
+}
+final class LoosePoint {
+    private $x; private $y;
+    public function __construct($x, $y) { $this->x = $x; $this->y = $y; }
+}
+			</code></pre>
+			<ul class="small">
+				<li>JIT ON で <code>TypedPoint</code> は<span class="key">代入時の型検証が省かれ</span>、<code>int</code> は refcount も不要で素のストアに</li>
+				<li><code>new</code> のアロケーションは両者共通かつ JIT でも消えない。差は<span class="key">代入パスぶん</span>に限られる</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>4-4. 比較演算子：<code>==</code> vs <code>===</code></h2>
+			<table class="compare-table">
+				<thead><tr><th>水準</th><th>比較</th><th>JIT ON での読み筋</th></tr></thead>
+				<tbody>
+					<tr><td>D1</td><td><code>int === int</code></td><td>1 命令の整数比較に特殊化</td></tr>
+					<tr class="highlight"><td>D2</td><td><code>int == int</code></td><td>D1 と同じ命令に潰れ差が消える</td></tr>
+					<tr><td>D3</td><td><code>int == 数値文字列</code></td><td>突出して遅い・JIT でも縮まらない（強制変換は C 側）</td></tr>
+					<tr><td>D4</td><td><code>int === string</code></td><td>型不一致で即 false、安い</td></tr>
+				</tbody>
+			</table>
+			<p><span class="key">JIT は型が揃えば <code>==</code> / <code>===</code> の差を消す。</span>差が残るのは coercion のときだけ。</p>
+			<p class="small muted"><code>==</code> の正しさの落とし穴（<code>0 == "a"</code> 等）は性能とは別軸。混ぜない。</p>
+		</section>
+
+		<section>
+			<h2>4-4. ドメイン層への接続</h2>
+			<ul class="emph-middle-list">
+				<li>ドメイン層を「型付きの値オブジェクト＋計算」で構成すると、<span class="key">JIT の恩恵を最大化</span></li>
+				<li>逆に、メソッドの中身が標準関数や IO の寄せ集めだと効かない（中身は C で JIT 対象外）</li>
+			</ul>
+			<p style="text-align:center"><span class="key emph-1_2x">「クラスで包んだ計算」に効く</span><br>のであって「クラスだから効く」ではない</p>
+		</section>
+
+		<!-- 4-5 mode -->
+		<section>
+			<h2>4-5. ケース④：mode 自体で結果が変わる</h2>
+			<p>同じ「JIT ON」でも mode で差が出る。<span class="key">アロケーションを排した純粋比較</span>：生成済みインスタンスのプロパティをホットループから読んで加算するだけ。</p>
+			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
+final class TypedBox {
+    public function __construct(private readonly int $value) {}
+    public function value(): int { return $this->value; }
+}
+// HotLoopBench:  N=10000 をループして value() を毎回呼ぶ
+public function benchTyped(): void
+{ $s = 0; $b = $this->typed; for ($i=0;$i&lt;self::N;$i++) $s += $b-&gt;value(); }
+			</code></pre>
+		</section>
+
+		<section>
+			<h2>4-5. 計測結果（mode＝平均 1 回あたり）</h2>
+			<table class="compare-table">
+				<thead><tr><th>水準</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
+				<tbody>
+					<tr><td>A: 生スカラー</td><td>17.74μs</td><td>4.91μs</td><td>3.77μs</td><td>約 4.7倍</td></tr>
+					<tr class="highlight"><td>B: 型付き TypedBox</td><td>91.64μs</td><td>49.66μs</td><td>38.45μs</td><td>約 2.4倍</td></tr>
+					<tr><td>C: 型なし LooseBox</td><td>92.62μs</td><td>52.09μs</td><td>38.04μs</td><td>約 2.4倍</td></tr>
+				</tbody>
+			</table>
+			<ul class="small">
+				<li><span class="key">OFF → function → tracing で単調に速くなる</span>。同じ「JIT ON」でも function→tracing でさらに 2〜3 割縮む</li>
+				<li>tracing が速い理由：ホットループ内の <code>value()</code> を <span class="key">trace にインライン化</span>できるから</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>4-5. 誠実な注意（重要）</h2>
+			<ul class="emph-middle-list">
+				<li>このループでは <span class="key">型付き B と型なし C の差はほぼ消える</span>（tracing で 38.4 vs 38.0μs）</li>
+				<li>tracing は<span class="key">観測した実行時の型で特殊化</span>するため、<code>int</code> が流れていれば宣言の有無は効きにくい</li>
+				<li>型宣言が効くのは <code>ConstructBench</code> のような「代入時の型検証」パス。steady-state の読み出しでは差が出にくい</li>
+			</ul>
+			<p class="muted small">「型を付ければ JIT で速くなる」を単純化しすぎない。</p>
+		</section>
+
+		<section class="center-punch">
+			<p>「JIT を入れた / 入れない」は粗すぎる。</p>
+			<p class="answer">mode（function / tracing）まで含めて測る。</p>
+		</section>
+
+		<!-- ============================================================ -->
+		<!-- 第5章 まとめ -->
+		<!-- ============================================================ -->
+		<section class="section-divider">
+			<h1>5. まとめ ― レイヤーで考える</h1>
+		</section>
+
+		<section>
+			<h2>5-1. 役割分担の整理</h2>
+			<table class="compare-table">
+				<thead><tr><th>仕組み</th><th>効く対象</th><th>典型的な場所</th></tr></thead>
+				<tbody>
+					<tr><td>OPcache</td><td>コード量が多い処理（コンパイルコスト）</td><td>外部依存・フレームワーク層</td></tr>
+					<tr><td>JIT</td><td>OPCODE 計算が支配的な処理</td><td>コアドメイン・数値計算層</td></tr>
 				</tbody>
 			</table>
 		</section>
 
-		<!-- ===== OK / NG チェックリスト ===== -->
 		<section>
-			<h2>導入時の注意</h2>
-			<div class="checklist">
-				<p class="ok"><span class="mark">◯</span>使うリソースだけをヒントにする</p>
-				<p class="ng"><span class="mark">✕</span>使わないリソースを指定する（逆効果）</p>
-			</div>
+			<h2>5-2. アーキテクチャとの相乗効果</h2>
+			<ul class="emph-middle-list">
+				<li><span class="key">外部依存の層（フレームワーク・I/O）</span> → OPcache が効く</li>
+				<li><span class="key">コアドメインの層（純粋なロジック・計算）</span> → JIT が効く</li>
+				<li>「関心の分離」をすると、高速化の効きどころも自然と分離される</li>
+			</ul>
 		</section>
 
-		<!-- ===== プロフィール ===== -->
-		<section>
-			<div class="profile profile--stacked">
-				<h3 class="profile__name">プロフィール</h3>
-				<img class="profile__photo" src="images/prof.png" alt="プロフィール写真">
-				<dl>
-					<dt>発表者</dt><dd>name</dd>
-					<dt>所属</dt><dd>company</dd>
-				</dl>
-			</div>
+		<section class="goal-slide">
+			<h2>5-3. 持ち帰ってほしいこと</h2>
+			<ul class="emph-middle-list">
+				<li>JIT は「OPCODE の実行」を速くするだけ。標準関数の中身は速くならない</li>
+				<li>JIT が効くのは<span class="key">数値計算・コールバック・ドメインロジック</span></li>
+				<li>OPcache は<span class="key">コード量に比例</span>して効く（フレームワーク向き）</li>
+				<li>「JIT」には PCRE JIT など別系統もある</li>
+				<li>レイヤー設計とキャッシュ / JIT の効きどころは対応している</li>
+			</ul>
+		</section>
+
+		<section class="center-punch">
+			<p class="answer">ご清聴ありがとうございました</p>
+			<p class="small muted">ベンチコード：<code>laravel/benchmarks/</code> ・ <code>laravel/bench/</code></p>
 		</section>
 
 	</div>
@@ -208,7 +511,7 @@ http_response_code(103);
 	});
 </script>
 <script>
-// 目次の自動生成（h2 を収集）
+// 目次の自動生成（章区切り .section-divider の h1 を収集）
 (function () {
 	var tocSection = document.getElementById('toc');
 	var tocList = document.getElementById('toc-list');
@@ -217,9 +520,10 @@ http_response_code(103);
 	var sections = document.querySelectorAll('.reveal .slides > section');
 	var items = [];
 	for (var i = 0; i < sections.length; i++) {
-		var h2 = sections[i].querySelector('h2');
-	if (!h2) continue;
-		var text = (h2.textContent || '').replace(/\s+/g, ' ').trim();
+		if (!sections[i].classList.contains('section-divider')) continue;
+		var h1 = sections[i].querySelector('h1');
+	if (!h1) continue;
+		var text = (h1.textContent || '').replace(/\s+/g, ' ').trim();
 	if (!text) continue;
 		items.push({ index: i, text: text });
 	}
