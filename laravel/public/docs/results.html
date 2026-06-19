@@ -25,6 +25,33 @@
 </header>
 
 <div class="card">
+<h3 style="margin-top:0">② OPcache が効くケース: Laravel 1 リクエストのブート時間（OFF vs ON・30回平均）</h3>
+<table>
+  <thead><tr><th>計測範囲</th><th>OPcache OFF</th><th>OPcache ON<br><span class="note">(file_cache=FPM相当)</span></th><th>速度比</th><th>短縮</th></tr></thead>
+  <tbody>
+    <tr><td><strong>boot</strong>（autoload+カーネルbootstrap / コンパイル支配的）</td><td>146.89 ms</td><td><strong>71.89 ms</strong></td><td><strong>約 2.04×</strong></td><td>75.0 ms</td></tr>
+    <tr><td>request（boot＋ルーティング＋Blade描画）</td><td>160.98 ms</td><td><strong>90.59 ms</strong></td><td>約 1.78×</td><td>70.4 ms</td></tr>
+  </tbody>
+</table>
+<p class="note">→ 同一の welcome リクエスト（<strong>boot で included 407 / declared 446、full request で included 523 / declared 514</strong>）を、OPcache <strong>OFF</strong>（毎プロセスで全ファイルを再コンパイル）と <strong>ON＋<code>opcache.file_cache</code></strong>（コンパイル済み opcode をプロセス跨ぎで再利用＝FPM 相当）で、別プロセス 30 回起動して平均。<strong>OPcache が省くのは「実行」ではなく「毎リクエストのコンパイル」</strong>なので、コンパイル支配的な <strong>boot で約 2.04×</strong>、ランタイム処理（描画）を含む full request では <strong>約 1.78×</strong> に縮む——“効くのはコンパイル部分”が比の差として出ている。JIT は本計測の対象外として両条件とも無効固定。 <code>bench/laravel_request.php</code> / <code>bench/laravel_boot_bench.sh</code></p>
+<p class="note">計測環境: PHP 8.5（Docker・Debian bookworm）。他コンテナを停止したアイドル状態での実測で、絶対値・比とも他負荷の有無でほぼ不変（再現性あり）。再現: <code>docker compose exec app sh bench/laravel_boot_bench.sh 30 boot</code>（<code>request</code> でフルリクエスト）。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">②' 対比: 薄い自作スクリプトでは OPcache の効果が薄い（OFF vs ON・30回平均）</h3>
+<table>
+  <thead><tr><th>require するファイル数</th><th>OPcache OFF</th><th>OPcache ON<br><span class="note">(file_cache=FPM相当)</span></th><th>速度比</th><th>短縮</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1 個</strong>（＝薄いスクリプト）</td><td>0.030 ms</td><td>0.036 ms</td><td>0.83×</td><td><strong>−0.006 ms</strong></td></tr>
+    <tr><td>50 個</td><td>0.199 ms</td><td>0.243 ms</td><td>0.82×</td><td><strong>−0.044 ms</strong></td></tr>
+    <tr><td>500 個</td><td>1.636 ms</td><td>1.891 ms</td><td>0.87×</td><td><strong>−0.255 ms</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">→ 関数 1 個だけの<strong>極小ファイル</strong>を N 個 require するだけの処理。Laravel と同じ計測方式（OFF＝毎回再コンパイル / ON＝<code>file_cache</code> でプロセス跨ぎ再利用）で別プロセス 30 回平均。<strong>どの行も ON は速くならない（むしろ僅かに遅い）</strong>。1 ファイルのコンパイルコストが極小なので OPcache が省ける分が無く、逆に <code>file_cache</code> から opcode を読み込むオーバーヘッドが上回るため。<strong>効くのはファイル「数」ではなくコンパイル「総量」（＝コード量）</strong>——500 個あっても中身が薄ければ効果は出ない。実 Laravel の 500 クラスは 1 つ 1 つに実コンパイルコストがあるから 2× になる、という上のカードとの対比。 <code>bench/thin_script.php</code> / <code>bench/thin_gen.php</code> / <code>bench/thin_bench.sh</code></p>
+<p class="note">計測環境: PHP 8.5（Docker・Debian bookworm）/ JIT は両条件とも無効固定。再現: <code>docker compose exec app sh bench/thin_bench.sh 30 "1 50 500"</code>。</p>
+</div>
+
+<div class="card">
 <h3 style="margin-top:0">in_array vs isset / array_key_exists（PHPBench・mode）</h3>
 <table>
   <thead><tr><th>処理</th><th>OPcache/JIT ON (mode)</th><th>rstdev</th><th>OPcache/JIT OFF</th><th>相対（ON基準）</th></tr></thead>
