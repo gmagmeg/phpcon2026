@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>計測結果 — performance-php</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top">
+  <a href="index.html">トップ</a>
+  <a href="stack.html">基本スタック</a>
+  <a href="measure-tools.html">計測ツール</a>
+  <a href="benchmarks.html">ベンチ &amp; 実行</a>
+  <a href="results.html" aria-current="page">計測結果</a>
+  <a href="jit.html">JITのしくみ</a>
+  <a href="report-reading.html">レポートの読み方</a>
+  <a href="presentation-outline.html">構成案</a>
+</nav>
+<div class="wrap">
+
+<header class="page">
+  <h1>計測結果サンプル</h1>
+  <div class="sub">このマシンでの実測値（参考）</div>
+</header>
+
+<div class="card">
+<h3 style="margin-top:0">in_array vs isset / array_key_exists（PHPBench・mode）</h3>
+<table>
+  <thead><tr><th>処理</th><th>OPcache/JIT ON (mode)</th><th>rstdev</th><th>OPcache/JIT OFF</th><th>相対（ON基準）</th></tr></thead>
+  <tbody>
+    <tr><td>in_array (O(n))</td><td>14.775μs</td><td>±0.51%</td><td>14.763μs</td><td>基準</td></tr>
+    <tr><td>isset (O(1))</td><td>0.016μs</td><td>±11.00%</td><td>0.028μs</td><td><strong>約920倍速</strong></td></tr>
+    <tr><td>array_key_exists (O(1))</td><td>0.030μs</td><td>±8.21%</td><td>0.036μs</td><td><strong>約490倍速</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">→ 10,000要素の末尾を探索。<code>in_array</code> は線形 O(n)、<code>isset</code>/<code>array_key_exists</code> はハッシュ参照 O(1)。<strong>OPcache/JIT の ON・OFF で in_array はほぼ不変</strong>（14.8μs↔14.8μs）。いずれも内部関数のため、差は完全に<strong>計算量由来</strong>で OPcache・JIT は無関係。 計測環境: PHP 8.5.7 / xdebug ❌（ON時 opcache ✔ / OFF時 opcache ❌）。 <code>benchmarks/InArrayBench.php</code></p>
+<p class="note">isset / array_key_exists は1回が ~10〜30ns と極小のため rstdev が大きい（±8〜11%）。絶対値の僅差より、<strong>桁（約920倍 / 約490倍）</strong>で読むのが正しい。 ON: 既定設定 / OFF: <code>--php-config='opcache.enable_cli: 0'</code></p>
+<p class="note">総実行時間（<code>revs × its = 2000 × 5 = 10,000回</code>分、<code>sum(result_time_net)</code>）— <strong>ON / OFF</strong>: in_array <strong>147.0ms / 157.4ms</strong> ・ isset <strong>0.16ms / 0.28ms</strong> ・ array_key_exists <strong>0.31ms / 0.37ms</strong>。in_array は ON/OFF ほぼ同等（内部関数）。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">ネイティブ float 演算子 vs bcmath（PHPBench・mode）</h3>
+<table>
+  <thead><tr><th>処理</th><th>JIT ON</th><th>JIT OFF</th><th>JIT効果</th></tr></thead>
+  <tbody>
+    <tr><td>ネイティブ <code>*</code> <code>+</code>（float）</td><td>1.253μs</td><td>4.562μs</td><td><strong>約3.6倍速</strong></td></tr>
+    <tr><td>bcmath（<code>bcmul</code>/<code>bcadd</code>）</td><td>260.511μs</td><td>274.366μs</td><td>ほぼ差なし</td></tr>
+  </tbody>
+</table>
+<p class="note">→ 同じ「掛けて足す」を1000回繰り返すループ。<strong>ネイティブ演算子は言語opcodeなので JIT が効く</strong>（1.25μs↔4.56μs）。一方 <strong>bcmath は C実装の内部関数なので JIT 非対象</strong>（261μs↔274μs で大差なし）。しかも文字列ベースの任意精度演算ゆえ、ネイティブの<strong>約200倍</strong>遅い。「JITが効く境界＝opcode か C内部関数か」を最も鮮明に示す対比。 <code>benchmarks/BcmathBench.php</code> ／ 解説は <a href="jit.html">JITのしくみ</a></p>
+<p class="note">総実行時間（<code>revs × its = 200 × 5 = 1,000回</code>分、<code>sum(result_time_net)</code>）— <strong>JIT ON / OFF</strong>: ネイティブ <strong>1.30ms / 4.54ms</strong>（JITで約3.5倍）・ bcmath <strong>275.3ms / 267.6ms</strong>（差なし）。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">③ コールバックを取る標準関数（array_map / usort）— JITは効くか（PHPBench・mode）</h3>
+<table>
+  <thead><tr><th>処理</th><th>JIT ON</th><th>JIT OFF</th><th>JIT効果</th></tr></thead>
+  <tbody>
+    <tr><td>手書き foreach（完全 userland）</td><td>69.480μs</td><td>92.276μs</td><td><strong>約1.33倍速（~33%）</strong></td></tr>
+    <tr><td>array_map（コールバック userland）</td><td>131.720μs</td><td>156.356μs</td><td><strong>約1.19倍速（~19%）</strong></td></tr>
+    <tr><td>usort（比較コールバックを多数回）</td><td>2.501ms</td><td>2.854ms</td><td><strong>約1.14倍速（~14%）</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">→ <strong>標準関数でも、渡すコールバックは userland PHP opcode なので JIT が効く</strong>。ただし純粋な手書きループ（33%）より効果は小さい（19% / 14%）。これは実行時間の一部が <strong>C実装側（配列の反復・ソートアルゴリズム）に費やされ、そこは JIT 非対象</strong>だから。「userland 比率が高いほど JIT が効く」が綺麗に出ている。 <code>benchmarks/CallbackBench.php</code> ／ 解説は <a href="jit.html">JITのしくみ</a></p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">④ 正規表現の「もう一つの JIT」= PCRE JIT（PHPBench・mode）</h3>
+<table>
+  <thead><tr><th>処理</th><th>pcre.jit ON<br><span class="note">（既定）</span></th><th>pcre.jit OFF</th><th>opcache.jit OFF<br><span class="note">（pcre.jitは残す）</span></th></tr></thead>
+  <tbody>
+    <tr><td>preg_match ×2000</td><td>511.157μs</td><td><strong>4.440ms</strong></td><td>509.758μs</td></tr>
+    <tr><td>preg_match_all ×2000</td><td>1.187ms</td><td><strong>7.852ms</strong></td><td>1.205ms</td></tr>
+  </tbody>
+</table>
+<p class="note">→ <code>preg_*</code> は C(PCRE)実装なので <strong>opcache の JIT は無関係</strong>（右列：opcache JIT を切っても 509μs↔511μs で不変）。一方 PCRE は<strong>独自の JIT</strong>を持ち、<code>pcre.jit=0</code> にすると <strong>preg_match 約8.7倍 / preg_match_all 約6.6倍</strong>遅くなる。「PHPのJIT(opcache)」と「正規表現のJIT(PCRE)」は<strong>別物</strong>。標準関数で劇的な JIT 効果を出せる唯一格の題材。 <code>benchmarks/PcreJitBench.php</code> ／ 解説は <a href="jit.html">JITのしくみ</a></p>
+</div>
+
+<div class="pager">
+  <a href="benchmarks.html">← ベンチ &amp; 実行</a>
+  <a href="jit.html">次へ: JITのしくみ →</a>
+</div>
+</div>
+</body>
+</html>

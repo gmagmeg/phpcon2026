@@ -1,0 +1,59 @@
+# ============================================================
+# Repository layout:
+#   ./        reveal.js presentation (jit-opc)
+#   laravel/  Laravel + FrankenPHP sub-app (performance-php)
+#
+# Laravel-specific patterns live in laravel/.gitignore (nested
+# .gitignore files are respected by git). The Laravel section
+# at the bottom of THIS file is a belt-and-suspenders safety
+# net for secrets and large directories.
+# ============================================================
+
+# --- reveal.js (root) ---------------------------------------
+
+# Editor directories and files
+.idea/
+*.iml
+*.iws
+*.eml
+
+# Build output
+dist/
+out/
+
+# Dependencies
+node_modules/
+
+# Cache
+.sass-cache/
+
+# Logs
+log/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temp
+tmp/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Other version control
+.svn/
+
+# Editor / IDE (common)
+.vscode/
+.fleet/
+.nova/
+.zed/
+
+# --- Laravel sub-app (laravel/) safety net ------------------
+# These duplicate laravel/.gitignore intentionally so secrets
+# cannot leak even if the nested file is removed or bypassed.
+laravel/.env
+laravel/.env.backup
+laravel/.env.production
+laravel/auth.json
+laravel/storage/*.key

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>計測ツール — performance-php</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top">
+  <a href="index.html">トップ</a>
+  <a href="stack.html">基本スタック</a>
+  <a href="measure-tools.html" aria-current="page">計測ツール</a>
+  <a href="benchmarks.html">ベンチ &amp; 実行</a>
+  <a href="results.html">計測結果</a>
+  <a href="jit.html">JITのしくみ</a>
+  <a href="report-reading.html">レポートの読み方</a>
+  <a href="presentation-outline.html">構成案</a>
+</nav>
+<div class="wrap">
+
+<header class="page">
+  <h1>計測ツール（導入済み）</h1>
+  <div class="sub">この環境にすでに入っている計測手段</div>
+</header>
+
+<table>
+  <thead><tr><th>ツール</th><th>状態</th><th>用途</th><th>場所 / 実行</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>PHPBench</strong><br><span class="note">phpbench/phpbench 1.7.0</span></td>
+      <td><span class="badge b-ok">導入済</span></td>
+      <td>マイクロベンチの計測ツール（唯一の計測手段）。<strong>中央値(mode)・分散(rstdev)</strong>・revs/iterations・<strong>メモリピーク(mem_peak)</strong>を出力。誤差か有意差かを判定できる。内部関数の比較も Laravel メソッドも計測可能。</td>
+      <td><code>vendor/bin/phpbench</code><br>設定 <code>phpbench.json</code> / ベンチ <code>benchmarks/</code></td>
+    </tr>
+    <tr>
+      <td><strong>OPcache 状態API</strong></td>
+      <td><span class="badge b-ok">導入済</span></td>
+      <td><code>opcache_get_status()</code> で JIT バッファ使用量・cached scripts・hits/misses を確認。</td>
+      <td>Web: <a href="http://localhost:8000/perf/status">/perf/status</a> (JSON)<br>Web: <a href="http://localhost:8000/perf/phpinfo">/perf/phpinfo</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>補足</h2>
+<div class="card">
+  <h3 style="margin-top:0">PHPBench</h3>
+  <p class="note">分散(rstdev)が出るので「誤差か有意差か」を判定できる。内部関数の比較（<code>InArrayBench</code> など）はそのまま、Laravel の関数（Collection / Str など）は <code>benchmarks/LaravelBench.php</code> でアプリを boot してから計測する。OPcache/JIT の切替は <code>--php-config</code> で行う（<a href="benchmarks.html">ベンチ &amp; 実行</a> 参照）。HTTPリクエスト1往復の実コストはマイクロベンチでは測りにくいので、その場合は HTTP負荷ツール（wrk 等）を使う。</p>
+</div>
+
+<div class="pager">
+  <a href="stack.html">← 基本スタック</a>
+  <a href="benchmarks.html">次へ: ベンチ &amp; 実行 →</a>
+</div>
+</div>
+</body>
+</html>

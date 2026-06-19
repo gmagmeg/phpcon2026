@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>基本スタック — performance-php</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top">
+  <a href="index.html">トップ</a>
+  <a href="stack.html" aria-current="page">基本スタック</a>
+  <a href="measure-tools.html">計測ツール</a>
+  <a href="benchmarks.html">ベンチ &amp; 実行</a>
+  <a href="results.html">計測結果</a>
+  <a href="jit.html">JITのしくみ</a>
+  <a href="report-reading.html">レポートの読み方</a>
+  <a href="presentation-outline.html">構成案</a>
+</nav>
+<div class="wrap">
+
+<header class="page">
+  <h1>基本スタック</h1>
+  <div class="sub">環境の土台となるソフトウェア構成</div>
+</header>
+
+<div class="grid">
+  <div class="stat"><div class="k">PHP</div><div class="v">8.5.7 <span class="badge b-ok">導入済</span></div><div class="note">PHP-FPM / Debian bookworm (glibc)</div></div>
+  <div class="stat"><div class="k">Laravel</div><div class="v">13.14.0 <span class="badge b-ok">導入済</span></div><div class="note">DBなし (session/cache=file)</div></div>
+  <div class="stat"><div class="k">Webサーバー</div><div class="v">nginx 1.27.5 <span class="badge b-ok">導入済</span></div><div class="note">クラシック配信(リクエスト毎)</div></div>
+  <div class="stat"><div class="k">Composer</div><div class="v">2.10.1 <span class="badge b-ok">導入済</span></div></div>
+</div>
+
+<h2>構成方針</h2>
+<table>
+  <thead><tr><th>項目</th><th>選択</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td>ベースOS</td><td>Debian bookworm (glibc)</td><td>計測精度のため。musl の Alpine は避ける。</td></tr>
+    <tr><td>配信モデル</td><td>クラシック（リクエスト毎）</td><td>Octane 等の常駐ワーカーを使わず、OPcache のリクエスト跨ぎキャッシュ効果を素直に観測。</td></tr>
+    <tr><td>DB</td><td>なし</td><td>session/cache=file, queue=sync。OPcache/JIT 検証に不要。</td></tr>
+    <tr><td>拡張</td><td>opcache, intl, zip, bcmath, pcntl</td><td>Laravel 起動と OPcache/JIT 検証に必要な最小構成。</td></tr>
+  </tbody>
+</table>
+
+<h2>コンテナ構成</h2>
+<table>
+  <thead><tr><th>サービス</th><th>イメージ</th><th>役割</th></tr></thead>
+  <tbody>
+    <tr><td><code>app</code></td><td>php:8.5-fpm-bookworm ベース（自前ビルド）</td><td>PHP-FPM / Laravel 実行本体</td></tr>
+    <tr><td><code>web</code></td><td>nginx:1.27-bookworm</td><td>Webサーバー（<code>app:9000</code> へ FastCGI 転送）</td></tr>
+  </tbody>
+</table>
+
+<div class="pager">
+  <a href="index.html">← トップ</a>
+  <a href="measure-tools.html">次へ: 計測ツール →</a>
+</div>
+</div>
+</body>
+</html>

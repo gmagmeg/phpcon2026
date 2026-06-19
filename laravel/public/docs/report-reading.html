@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>レポートの読み方 — performance-php</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top">
+  <a href="index.html">トップ</a>
+  <a href="stack.html">基本スタック</a>
+  <a href="measure-tools.html">計測ツール</a>
+  <a href="benchmarks.html">ベンチ &amp; 実行</a>
+  <a href="results.html">計測結果</a>
+  <a href="jit.html">JITのしくみ</a>
+  <a href="report-reading.html" aria-current="page">レポートの読み方</a>
+  <a href="presentation-outline.html">構成案</a>
+</nav>
+<div class="wrap">
+
+<header class="page">
+  <h1>PHPBench aggregate レポートの読み方</h1>
+  <div class="sub">vendor/bin/phpbench run ... --report=aggregate の出力を読む</div>
+</header>
+
+<h2>サンプル出力</h2>
+<pre><code>+-----------------+-------------------------+-----+------+-----+----------+----------+--------+
+| benchmark       | subject                 | set | revs | its | mem_peak | mode     | rstdev |
++-----------------+-------------------------+-----+------+-----+----------+----------+--------+
+| CollectionBench | benchCollectionPipeline |     | 2000 | 5   | 6.909mb  | 99.151μs | ±0.53% |
+| CollectionBench | benchRawArray           |     | 2000 | 5   | 6.909mb  | 6.304μs  | ±1.59% |
+| CollectionBench | benchArrayFunctions     |     | 2000 | 5   | 6.909mb  | 49.285μs | ±0.32% |
++-----------------+-------------------------+-----+------+-----+----------+----------+--------+</code></pre>
+
+<h2>各列の意味</h2>
+<table>
+  <thead><tr><th>列</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td><code>benchmark</code></td><td>ベンチクラス名（<code>CollectionBench</code> = <code>benchmarks/CollectionBench.php</code>）</td></tr>
+    <tr><td><code>subject</code></td><td>計測対象メソッド名（<code>bench〜</code> の各メソッド）</td></tr>
+    <tr><td><code>set</code></td><td>パラメータセット名。<code>@ParamProviders</code> でデータを差し替えた時だけ入る。未使用なら空</td></tr>
+    <tr><td><code>revs</code></td><td>1 iteration 内でメソッドを<strong>繰り返す回数</strong>（例 2000）。1回が短すぎて測れないのを均すため</td></tr>
+    <tr><td><code>its</code></td><td><strong>iteration 数</strong>（例 5）。各 iteration は別プロセスで実行。この5個のばらつきから統計を出す</td></tr>
+    <tr><td><code>mem_peak</code></td><td>プロセスのメモリ使用ピーク（≒アプリ起動分が主。メソッド間の差は小さい）</td></tr>
+    <tr><td><code>mode</code></td><td><strong>代表値（速さの本命）</strong>。<strong>最頻値（KDE：カーネル密度推定によるピーク）</strong>であり、単純平均・中央値ではない。外れ値に強く、実用上は中央値に近い。<strong>1回あたり</strong>の実行時間で、小さいほど速い。平均も見たいなら <code>mean</code> 列を足す</td></tr>
+    <tr><td><code>rstdev</code></td><td><strong>相対標準偏差</strong>。ばらつきの割合。<strong>小さいほど計測が安定＝信頼できる</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>数値の読み取り例</h2>
+<table>
+  <thead><tr><th>subject</th><th>mode</th><th>rstdev</th><th>素のforeach比</th></tr></thead>
+  <tbody>
+    <tr><td>benchRawArray（素の foreach）</td><td>6.304μs</td><td>±1.59%</td><td>1.0倍（最速・基準）</td></tr>
+    <tr><td>benchArrayFunctions（array_*）</td><td>49.285μs</td><td>±0.32%</td><td>約7.8倍</td></tr>
+    <tr><td>benchCollectionPipeline（Collection）</td><td>99.151μs</td><td>±0.53%</td><td>約15.7倍</td></tr>
+  </tbody>
+</table>
+<p class="note">単位 μs はマイクロ秒（1μs = 0.001ms）。rstdev が全て ±2%未満なので、この差は<strong>誤差ではなく有意</strong>と判断できる。</p>
+
+<h2>読む順番のコツ</h2>
+<div class="card">
+  <ol style="margin:.2rem 0; padding-left:1.2rem;">
+    <li><strong>まず <code>rstdev</code> を見る</strong> — 大きい（目安 ±5〜10%超）と <code>mode</code> が信用できない。<code>its</code> や <code>revs</code> を増やして測り直す。</li>
+    <li><strong>rstdev が小さいことを確認してから <code>mode</code> を比較</strong> — 安定した状態でのみ速さを比べる。</li>
+    <li><strong><code>mem_peak</code></strong> はメモリも見たい時に。各行ほぼ同じなら差は実行時間に出ている。</li>
+  </ol>
+</div>
+
+<h2>列を増やしたい場合</h2>
+<p class="note">平均・最小・標準偏差なども出せる。例:</p>
+<pre><code># mean(平均) / min(最小) / stdev(標準偏差) などを追加
+docker compose exec app vendor/bin/phpbench run benchmarks/CollectionBench.php \
+  --report='{"extends":"aggregate","cols":["subject","mode","mean","min","stdev","rstdev"]}'</code></pre>
+
+<h2>総実行時間を見たい場合</h2>
+<p>標準の <code>mode</code>/<code>mean</code> は<strong>1回あたり</strong>に正規化された値で、総時間は出ない。総時間（<code>revs × its</code> 回分の合計＝実際に計測に費やした時間）を出すには、カスタム列で <code>sum(result_time_net)</code> を足す。</p>
+<pre><code>docker compose exec app vendor/bin/phpbench run benchmarks/BcmathBench.php \
+  --report='{"extends":"aggregate","cols":{
+    "subject":"first(subject_name)",
+    "revs":"first(variant_revs)",
+    "its":"count(result_time_avg)",
+    "per_call":"mode(result_time_avg) as time",
+    "total":"sum(result_time_net) as time"
+  }}'</code></pre>
+<table>
+  <thead><tr><th>subject</th><th>revs</th><th>its</th><th>per_call（1回あたり）</th><th>total（総時間）</th></tr></thead>
+  <tbody>
+    <tr><td>benchNativeFloat</td><td>200</td><td>5</td><td>1.255μs</td><td>1.264ms</td></tr>
+    <tr><td>benchBcmath</td><td>200</td><td>5</td><td>264.683μs</td><td>265.560ms</td></tr>
+  </tbody>
+</table>
+<p class="note"><code>result_time_net</code> = 各 iteration の生の合計時間（= revs 回分）。それを <code>sum()</code> で全 iteration 合算すると総時間になる。検算: <code>per_call × revs × its</code> ≈ total（1.255μs × 200 × 5 ≈ 1.26ms）。なお<strong>プロセス起動やブートまで含めた壁時計</strong>が欲しいなら <code>time docker compose exec app vendor/bin/phpbench run ...</code> を使う。</p>
+
+<div class="pager">
+  <a href="jit.html">← JITのしくみ</a>
+  <a href="presentation-outline.html">次へ: 構成案 →</a>
+</div>
+</div>
+</body>
+</html>

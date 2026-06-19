@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jit-opc slides",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start", "--", "--port", "8123"],
+      "port": 8123
+    }
+  ]
+}

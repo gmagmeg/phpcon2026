@@ -1,0 +1,828 @@
+/* =====================================================================
+ * Reveal.js Slide Theme — reusable template
+ * ---------------------------------------------------------------------
+ * このデッキ（103 Early Hints）の汎用スタイルを抽出したテンプレートです。
+ * 個別スライド固有の section#id ルールは含めていません。
+ *
+ * 使い方:
+ *   1. reveal.css / theme/white.css を読み込んだ後にこの theme.css を読む
+ *   2. 下記の Web フォントを <head> で読み込む（template.html 参照）
+ *
+ * ルール: 本文中では太字（bold）を使わない。見出しの太字は可。
+ * ===================================================================== */
+
+/* ---------------------------------------------------------------------
+ * 1. デザイントークン（色・フォント）
+ * ------------------------------------------------------------------- */
+:root {
+    --accent: #134aa9; /* deep blue: アクセント色 */
+    --text: #111111; /* 本文色 */
+    --base-red: #b91c1c; /* 警告・NG・最終レスポンス */
+    --heading-navy: #1a2f4a; /* 見出し色 */
+
+    /* Reveal テーマの上書き */
+    --r-heading-text-transform: none; /* 見出しを大文字化しない（入力の大小を維持） */
+    --r-main-font: "Nunito", "M PLUS Rounded 1c", "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    --r-heading-font: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+}
+
+.reveal {
+    font-family:
+        "Nunito", "M PLUS Rounded 1c", "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+        "Yu Gothic", Meiryo, sans-serif;
+    color: var(--text);
+}
+
+/* highlight.js のコメントを白に（monokai 背景で読みやすく） */
+.hljs-comment {
+    color: #ffffff !important;
+}
+
+/* ---------------------------------------------------------------------
+ * 2. レイアウト（左寄せ・中央配置・余白）
+ * ------------------------------------------------------------------- */
+.reveal .slides {
+    text-align: left;
+}
+.reveal section {
+    max-width: min(1320px, 92vw);
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.reveal section > * + * {
+    margin-top: 18px;
+}
+
+/* ---------------------------------------------------------------------
+ * 3. 見出し（h1 / h2 / h3）
+ * ------------------------------------------------------------------- */
+.reveal h2,
+.reveal h3 {
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Nunito", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.25;
+    margin: 0 0 14px 0;
+}
+.reveal h1 {
+    font-family: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    font-weight: 700;
+    font-size: clamp(32px, 5.5vw, 60px);
+    line-height: 1.1;
+    margin: 0;
+    color: var(--heading-navy);
+}
+.reveal h2 {
+    font-size: clamp(38px, 5vw, 60px);
+    color: var(--heading-navy);
+    text-align: left;
+}
+.reveal h3 {
+    font-size: clamp(30px, 4vw, 44px);
+    font-weight: 600;
+    color: #334155;
+    text-align: left;
+}
+.reveal p + h3,
+.reveal ul + h3,
+.reveal ol + h3 {
+    margin-top: 1em;
+}
+
+/* 中央寄せ・縦線つきのスライドタイトル */
+.reveal h2.slide-title {
+    font-size: clamp(48px, 6vw, 72px);
+    display: inline-block;
+    margin: 0 auto;
+    padding-left: 16px;
+    border-left: 6px solid var(--accent);
+    text-align: center;
+}
+
+/* 下線アクセントつきセクション見出し */
+h2.section-div {
+    border-bottom: solid 3px #cce4ff;
+    position: relative;
+    margin-top: 15%;
+}
+h2.section-div:after {
+    position: absolute;
+    content: " ";
+    display: block;
+    border-bottom: solid 3px #5472cd;
+    bottom: -3px;
+    width: 20%;
+}
+
+/* ---------------------------------------------------------------------
+ * 4. 本文（段落・リスト）
+ * ------------------------------------------------------------------- */
+.reveal p,
+.reveal ul,
+.reveal li {
+    font-size: clamp(22px, 2.6vw, 32px);
+    line-height: 1.25;
+    text-align: left;
+}
+.reveal p {
+    font-size: clamp(26.4px, 3.12vw, 38.4px);
+    margin-bottom: 0;
+}
+.reveal ul {
+    width: 100%;
+}
+.reveal ul.none-style-list {
+    list-style: none;
+    margin-left: 0;
+}
+.reveal ul.mt-0 {
+    margin-top: 0;
+}
+.reveal li + li {
+    margin-top: 8px;
+}
+.reveal p + ul {
+    margin-top: 0.5em;
+    padding-top: 0;
+}
+h4 + ul,
+h4 + p {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* 強調リスト（文字を大きく） */
+ul.emph-list li,
+ol.emph-list li {
+    font-size: 1.5em;
+}
+ul.emph-middle-list li,
+ol.emph-middle-list li {
+    font-size: 1.2em;
+}
+
+/* リスト内の区切り・サブ項目 */
+.reveal li.sep {
+    list-style: none;
+    height: 0.8em;
+    margin: 0.4em 0;
+}
+.reveal ul.mark li {
+    list-style: circle;
+    font-size: 0.9em;
+    margin-left: 1.2em;
+}
+
+/* ---------------------------------------------------------------------
+ * 5. 図・画像（figure）
+ * ------------------------------------------------------------------- */
+.slide-figure {
+    width: 100%;
+    margin: 10px 0 0;
+    text-align: center;
+}
+.slide-figure img {
+    max-width: min(860px, 100%);
+    width: 100%;
+    height: auto;
+    margin-top: 12px;
+    border-radius: 12px;
+}
+.slide-figure figcaption {
+    margin-top: 2px;
+    text-align: center;
+    font-size: clamp(22px, 2.6vw, 32px);
+    line-height: 1.25;
+}
+.slide-figure img + figcaption {
+    margin-top: 2px;
+}
+.slide-figure:has(figcaption) img {
+    margin-top: 4px;
+    margin-bottom: 0;
+}
+.slide-figure.caption-top figcaption {
+    margin-top: 0;
+    margin-bottom: 4px;
+}
+.slide-figure.caption-top img {
+    margin-top: 0;
+}
+.reveal .slide-figure + p {
+    margin-top: 8px;
+}
+
+/* 画像を横並び */
+.figure-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    justify-content: center;
+    margin-top: 10px;
+}
+.figure-row .slide-figure {
+    flex: 1 1 0;
+    min-width: 0;
+    margin: 0;
+}
+.figure-row .slide-figure img {
+    max-width: 100%;
+    width: 100%;
+}
+
+/* ロゴを並べる（キャプション付き） */
+.server-logos {
+    display: flex;
+    gap: 64px;
+    justify-content: center;
+    align-items: center;
+    margin: 32px 0;
+}
+.server-logos figure {
+    margin: 0;
+    text-align: center;
+}
+.server-logos img {
+    width: clamp(120px, 18vw, 220px);
+    height: auto;
+}
+.server-logos figcaption {
+    margin-top: 10px;
+    font-size: clamp(32px, 3.8vw, 48px);
+    font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------
+ * 6. 2カラムレイアウト
+ * ------------------------------------------------------------------- */
+/* 左テキスト・右画像 */
+.reveal .text-image-row {
+    display: flex;
+    gap: 4%;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+.reveal .text-image-row .ti-text {
+    flex: 1 1 42%;
+    min-width: 0;
+}
+.reveal .text-image-row .ti-image {
+    flex: 1 1 58%;
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+}
+
+/* グリッド2カラム */
+.reveal .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+.reveal .columns .col {
+    min-width: 0;
+}
+.reveal .columns pre {
+    font-size: 0.65em;
+}
+@media (max-width: 900px) {
+    .reveal .columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 横並び比較（左右で図を見せる） */
+.reveal .compare-row {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    justify-content: center;
+    width: 100%;
+}
+.reveal .compare-row > .slide-figure {
+    flex: 1 1 50%;
+    margin: 0;
+    min-width: 0;
+}
+.reveal .compare-row > .slide-figure img {
+    max-width: 100%;
+}
+.reveal .compare-row > .slide-figure figcaption {
+    min-height: 2.5em; /* 1行/2行のキャプション差を吸収して画像の上端を揃える */
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+@media (max-width: 960px) {
+    .reveal .compare-row {
+        flex-direction: column;
+        align-items: center;
+    }
+}
+.reveal .compare-row.compare-row--stack {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+.reveal .compare-row.compare-row--stack > .slide-figure {
+    flex: 0 0 auto;
+    max-width: 720px;
+    width: 100%;
+}
+.reveal .compare-row.compare-row--stack > .slide-figure figcaption {
+    min-height: 0;
+}
+/* 比較スライドはコンテナ幅を広げて画像を大きく見せる */
+.reveal section:has(.compare-row) {
+    max-width: min(1680px, 96vw);
+}
+
+/* ---------------------------------------------------------------------
+ * 7. コードブロック
+ * ------------------------------------------------------------------- */
+.reveal pre {
+    width: 100%;
+    font-size: 0.6em;
+    margin-top: 16px;
+}
+.reveal pre code {
+    max-height: 560px;
+    font-family: "SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", "Liberation Mono", monospace;
+}
+/* インラインコードの強調 */
+.reveal code.code-emph {
+    background: rgba(19, 74, 169, 0.08);
+    color: var(--accent);
+    border: 1px solid rgba(19, 74, 169, 0.45);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: 700;
+}
+.code-highlight {
+    color: oklch(57.7% 0.245 27.325);
+    word-break: break-word;
+}
+
+/* ---------------------------------------------------------------------
+ * 8. テーブル
+ * ------------------------------------------------------------------- */
+.reveal table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: clamp(18px, 2vw, 26px);
+}
+.reveal thead th {
+    background: #eef2f9;
+    color: var(--heading-navy);
+    font-weight: 700;
+    padding: 10px 14px;
+    border-bottom: 2px solid #c5d3e8;
+}
+.reveal tbody td,
+.reveal tbody th {
+    border-bottom: 1px solid #e5e7eb;
+    padding: 10px 14px;
+    vertical-align: top;
+}
+.reveal tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+.reveal td code {
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+/* 大きめの比較テーブル */
+.reveal .compare-table {
+    font-size: clamp(25px, 2.8vw, 36px);
+}
+.reveal .compare-table thead th,
+.reveal .compare-table tbody td,
+.reveal .compare-table tbody th {
+    padding: 16px 22px;
+}
+/* 比較テーブルで注目行をハイライト */
+.reveal .compare-table tbody tr.highlight {
+    background: rgba(19, 74, 169, 0.1);
+}
+.reveal .compare-table tbody tr.highlight td {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* ---------------------------------------------------------------------
+ * 9. 特殊スライド種別（クラスで切り替え）
+ * ------------------------------------------------------------------- */
+/* タイトルスライド: 全面背景・左下にテキスト */
+.reveal section.title-slide {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 12vh 8vw;
+    gap: 16px;
+    color: #fff;
+    max-width: 100%;
+    width: 100%;
+}
+.reveal section.title-slide h1,
+.reveal section.title-slide h2 {
+    color: #fff;
+    text-align: left;
+}
+.reveal section.title-slide h2 {
+    font-size: 2em;
+}
+.reveal section.title-slide .small {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 28px;
+}
+
+/* 章区切りスライド: 帯つきの大見出しを中央に */
+.reveal section.section-divider {
+    text-align: center;
+    padding: 22vh 2.5ch 0;
+}
+.reveal section.section-divider h1 {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    padding: 0.25em 0.6em;
+    border-radius: 10px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    letter-spacing: 0.01em;
+}
+
+/* 章つなぎスライド: 本文を一回り大きく */
+.reveal section.lead-bridge p {
+    font-size: clamp(32px, 3.7vw, 46px);
+}
+
+/* ゴールスライド: 見出し・本文を一回り大きく */
+.reveal section.goal-slide h2 {
+    font-size: clamp(46px, 6vw, 72px);
+}
+.reveal section.goal-slide li {
+    font-size: clamp(27px, 3.1vw, 38px);
+}
+
+/* パンチライン（結論）スライド: 中央寄せ・特大 */
+.reveal section.center-punch {
+    align-items: center;
+    text-align: center;
+}
+.reveal section.center-punch p {
+    text-align: center;
+    font-size: clamp(38px, 4.5vw, 56px);
+}
+.reveal section.center-punch .answer {
+    font-size: clamp(64px, 8vw, 104px);
+}
+
+/* ---------------------------------------------------------------------
+ * 10. OK / NG・凡例・チェックリスト
+ * ------------------------------------------------------------------- */
+.reveal .checklist {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.reveal .checklist .mark {
+    font-weight: 900;
+    margin-right: 0.25em;
+}
+.reveal .checklist .ok .mark {
+    color: #15803d; /* green */
+}
+.reveal .checklist .ng .mark {
+    color: var(--base-red); /* red */
+}
+.reveal .checklist p {
+    margin: 0;
+}
+.reveal .legend {
+    margin: 6px 0 12px;
+}
+.reveal .legend .ok,
+.reveal .legend-ok {
+    color: #15803d;
+    font-weight: 700;
+}
+.reveal .legend .ng,
+.reveal .legend-ng {
+    color: var(--base-red);
+    font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------
+ * 11. アイコン（インライン SVG 用サイズ）
+ * ------------------------------------------------------------------- */
+.reveal h2 .idea-icon,
+.reveal h2 .goal-icon {
+    height: 1em;
+    width: auto;
+    vertical-align: -0.12em;
+    margin-right: 0.3em;
+}
+.reveal h2 .idea-icon {
+    color: #f5a623;
+}
+.reveal h2 .goal-icon {
+    color: var(--accent);
+}
+.reveal p .search-icon {
+    height: 1em;
+    width: auto;
+    vertical-align: -0.12em;
+    margin-left: 0.3em;
+    color: var(--accent);
+}
+.reveal .inline-icon {
+    height: 1.4em;
+    width: auto;
+    vertical-align: -0.3em;
+    margin: 0 0.1em;
+}
+
+/* ---------------------------------------------------------------------
+ * 12. プロフィールスライド
+ * ------------------------------------------------------------------- */
+.reveal .profile {
+    display: grid;
+    grid-template-columns: 0.72fr 1.28fr;
+    gap: 28px;
+    align-items: center;
+}
+.reveal .profile--stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+}
+.reveal .profile--stacked .profile__name {
+    margin: 0;
+    align-self: flex-start;
+}
+.reveal .profile--stacked .profile__photo {
+    margin-top: 0;
+    max-width: 420px;
+}
+.reveal .profile--stacked dl {
+    margin: 0;
+    align-self: center;
+}
+.reveal .profile__photo {
+    margin-top: -3em;
+    width: 100%;
+    max-width: 420px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(23, 21, 21, 0.12);
+}
+.reveal .profile a {
+    font-size: 0.7em;
+}
+.reveal .profile__logos {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin: 6px 0 12px;
+}
+.reveal .profile__logo {
+    height: 44px;
+}
+.reveal .profile__logo--booost {
+    height: 42px;
+}
+.reveal .profile__bullets {
+    margin: 6px 0 10px;
+}
+.reveal .profile__banner img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.1);
+}
+.reveal .profile dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    column-gap: 14px;
+    row-gap: 6px;
+    font-size: 0.9em;
+    margin: 8px 0 0;
+}
+.reveal .profile dt {
+    margin-top: 0.5em;
+    font-weight: 700;
+}
+.reveal .profile dd {
+    margin-top: 0.5em;
+}
+@media (max-width: 900px) {
+    .reveal .profile {
+        grid-template-columns: 1fr;
+    }
+    .reveal .profile__photo {
+        max-width: 60vw;
+    }
+}
+
+/* ---------------------------------------------------------------------
+ * 13. リンク・引用
+ * ------------------------------------------------------------------- */
+.reveal a {
+    color: var(--heading-navy);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    text-decoration-color: #c5d3e8;
+}
+.reveal a:hover {
+    color: var(--accent);
+    text-decoration-color: var(--accent);
+}
+.reveal blockquote {
+    display: block;
+    position: relative;
+    width: 100%;
+    font-style: italic;
+    box-shadow: 0px 0px 2px rgba(0, 0, 0, 0.2);
+    font-size: 70%;
+    color: #aca0a0;
+}
+
+/* 常時表示の見出し（右下に小さく） */
+.persistent-h2 {
+    position: fixed;
+    bottom: 12px;
+    right: 80px;
+    font-size: 18px;
+    color: var(--accent);
+    opacity: 0.6;
+    z-index: 1000;
+    pointer-events: none;
+    font-weight: bold;
+}
+
+/* ---------------------------------------------------------------------
+ * 14. ユーティリティ
+ * ------------------------------------------------------------------- */
+.reveal .muted {
+    color: #666;
+}
+.reveal .small {
+    font-size: 24px;
+}
+.reveal .small-font {
+    font-size: 0.7em;
+}
+/* キーワード強調（太字を使わず色で強調） */
+.key {
+    color: var(--accent);
+}
+/* 結論テキスト */
+.reveal .answer {
+    font-size: 46px;
+    color: var(--accent);
+    font-weight: 800;
+    margin: 8px 0 16px;
+}
+/* 文字サイズ倍率 */
+.reveal .emph-2x,
+.emph-2x {
+    font-size: 2em;
+}
+.reveal .emph-1_5x,
+.emph-1_5x {
+    font-size: 1.5em;
+}
+.reveal .emph-1_5x_under {
+    font-size: 1.5em;
+    text-decoration: underline;
+}
+.reveal .emph-1_2x,
+span.emph-1_2x {
+    font-size: 1.2em;
+}
+/* 下線 */
+.under-line {
+    text-decoration: underline;
+    text-underline-offset: 0.1em;
+    text-decoration-thickness: 0.1em;
+    text-decoration-color: grey;
+}
+/* 余白調整 */
+.pt-1ch {
+    padding-top: 1.5ch;
+}
+.pt-0 {
+    padding-top: 0;
+}
+.mpt-0,
+.reveal .mpt-0 {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+.reveal .mpb-0 {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* ---------------------------------------------------------------------
+ * 14b. 実行パイプライン図 / レイヤー図（OPcache・JIT 説明用）
+ * ------------------------------------------------------------------- */
+/* 横並びのパイプライン（PHPソース → 字句解析 → … → 実行） */
+.reveal .pipeline {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.4em;
+    margin: 0.8em 0;
+}
+.reveal .pipeline .step {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.5em 0.7em;
+    border: 2px solid var(--accent);
+    border-radius: 0.4em;
+    background: #f4f7fc;
+    color: var(--text);
+    font-size: 0.82em;
+    line-height: 1.3;
+    min-width: 4.5em;
+}
+.reveal .pipeline .step.cached {
+    border-color: var(--base-red);
+    background: #fdf1f1;
+}
+.reveal .pipeline .step.native {
+    border-color: #1f8a4c;
+    background: #eef8f1;
+}
+.reveal .pipeline .arrow {
+    display: flex;
+    align-items: center;
+    color: var(--accent);
+    font-size: 1.2em;
+}
+/* キャッシュ範囲などを示す注釈 */
+.reveal .pipeline-note {
+    text-align: center;
+    color: var(--base-red);
+    font-size: 0.8em;
+    margin-top: -0.2em;
+}
+
+/* 縦に積むレイヤー図（CPU の上に JIT, OPcache, PHP… を重ねる） */
+.reveal .layer-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35em;
+    max-width: 24em;
+    margin: 0.6em auto;
+}
+.reveal .layer-stack .layer {
+    padding: 0.5em 0.8em;
+    border-radius: 0.4em;
+    text-align: center;
+    font-size: 0.85em;
+    border: 2px solid #c9d4e6;
+    background: #f4f7fc;
+}
+.reveal .layer-stack .layer.hot {
+    border-color: var(--base-red);
+    background: #fdf1f1;
+}
+.reveal .layer-stack .layer small {
+    display: block;
+    color: #555;
+    font-size: 0.8em;
+}
+
+/* ---------------------------------------------------------------------
+ * 15. print-pdf 用の上書き（decktape / ?print-pdf でのPDF化対策）
+ * ------------------------------------------------------------------- */
+/* タイトルスライドのh1が下付きになる問題を固定 */
+.print-pdf .reveal section.title-slide {
+    justify-content: flex-start !important;
+    padding-top: 8vh !important;
+}
+/* スライド番号: グレー背景を除去して黒字に */
+.reveal .slide-number {
+    background-color: transparent !important;
+    color: #111 !important;
+}
+/* 画像・コンテナの box-shadow を全廃（PDF化時にグレー枠として残るため） */
+.reveal .slides img,
+.reveal .slides figure,
+.reveal .slides [style*="box-shadow"] {
+    box-shadow: none !important;
+}
