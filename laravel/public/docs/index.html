@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>performance-php ドキュメント</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top">
+  <a href="index.html" aria-current="page">トップ</a>
+  <a href="stack.html">基本スタック</a>
+  <a href="measure-tools.html">計測ツール</a>
+  <a href="benchmarks.html">ベンチ &amp; 実行</a>
+  <a href="results.html">計測結果</a>
+  <a href="jit.html">JITのしくみ</a>
+  <a href="report-reading.html">レポートの読み方</a>
+  <a href="presentation-outline.html">構成案</a>
+</nav>
+<div class="wrap">
+
+<header class="page">
+  <h1>performance-php — ドキュメント</h1>
+  <div class="sub">PHP 8.5 OPcache / JIT 検証環境 &nbsp;|&nbsp; 更新日: 2026-06-09</div>
+</header>
+
+<p>PHP 8.5 で OPcache / JIT を「作って・測って・確かめる」ための環境です。カテゴリ別に分割しています。</p>
+
+<div class="hub">
+  <a href="stack.html">
+    <h3>基本スタック</h3>
+    <p>PHP 8.5 / Laravel / nginx / Composer のバージョンと構成方針。</p>
+  </a>
+  <a href="measure-tools.html">
+    <h3>計測ツール（導入済み）</h3>
+    <p>PHPBench・OPcache状態API。</p>
+  </a>
+  <a href="benchmarks.html">
+    <h3>ベンチ &amp; 実行方法</h3>
+    <p>benchmarks/ のベンチクラス一覧、PHPBench の実行手順、JIT切替。</p>
+  </a>
+  <a href="results.html">
+    <h3>計測結果サンプル</h3>
+    <p>in_array vs isset / array_key_exists の実測（O(n) vs O(1)）。</p>
+  </a>
+  <a href="jit.html">
+    <h3>JITのしくみ</h3>
+    <p>なぜ Math で JIT が効いて in_array で効かないのか。</p>
+  </a>
+  <a href="report-reading.html">
+    <h3>レポートの読み方</h3>
+    <p>PHPBench aggregate レポート（mode / rstdev / revs 等）の読み方。</p>
+  </a>
+  <a href="presentation-outline.html">
+    <h3>プレゼン構成案</h3>
+    <p>プロポーザル案の転記とセッション構成のたたき台。</p>
+  </a>
+</div>
+
+<h2>クイックリンク（環境内）</h2>
+<table>
+  <tbody>
+    <tr><td><a href="http://localhost:8000/">/</a></td><td>Laravel トップ</td></tr>
+    <tr><td><a href="http://localhost:8000/perf/status">/perf/status</a></td><td>OPcache / JIT 状態 (JSON)</td></tr>
+    <tr><td><a href="http://localhost:8000/perf/phpinfo">/perf/phpinfo</a></td><td>phpinfo()</td></tr>
+  </tbody>
+</table>
+
+<footer>performance-php — このページ群は <code>public/docs/</code> 配下です。</footer>
+
+<div class="pager">
+  <span></span>
+  <a href="stack.html">次へ: 基本スタック →</a>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>計測結果 — performance-php</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top">
+  <a href="index.html">トップ</a>
+  <a href="stack.html">基本スタック</a>
+  <a href="measure-tools.html">計測ツール</a>
+  <a href="benchmarks.html">ベンチ &amp; 実行</a>
+  <a href="results.html" aria-current="page">計測結果</a>
+  <a href="jit.html">JITのしくみ</a>
+  <a href="report-reading.html">レポートの読み方</a>
+  <a href="presentation-outline.html">構成案</a>
+</nav>
+<div class="wrap">
+
+<header class="page">
+  <h1>計測結果サンプル</h1>
+  <div class="sub">このマシンでの実測値（参考）</div>
+</header>
+
+<div class="card">
+<h3 style="margin-top:0">② OPcache が効くケース: Laravel 1 リクエストのブート時間（OFF vs ON・30回平均）</h3>
+<table>
+  <thead><tr><th>計測範囲</th><th>OPcache OFF</th><th>OPcache ON<br><span class="note">(file_cache=FPM相当)</span></th><th>速度比</th><th>短縮</th></tr></thead>
+  <tbody>
+    <tr><td><strong>boot</strong>（autoload+カーネルbootstrap / コンパイル支配的）</td><td>146.89 ms</td><td><strong>71.89 ms</strong></td><td><strong>約 2.04×</strong></td><td>75.0 ms</td></tr>
+    <tr><td>request（boot＋ルーティング＋Blade描画）</td><td>160.98 ms</td><td><strong>90.59 ms</strong></td><td>約 1.78×</td><td>70.4 ms</td></tr>
+  </tbody>
+</table>
+<p class="note">→ 同一の welcome リクエスト（<strong>boot で included 407 / declared 446、full request で included 523 / declared 514</strong>）を、OPcache <strong>OFF</strong>（毎プロセスで全ファイルを再コンパイル）と <strong>ON＋<code>opcache.file_cache</code></strong>（コンパイル済み opcode をプロセス跨ぎで再利用＝FPM 相当）で、別プロセス 30 回起動して平均。<strong>OPcache が省くのは「実行」ではなく「毎リクエストのコンパイル」</strong>なので、コンパイル支配的な <strong>boot で約 2.04×</strong>、ランタイム処理（描画）を含む full request では <strong>約 1.78×</strong> に縮む——“効くのはコンパイル部分”が比の差として出ている。JIT は本計測の対象外として両条件とも無効固定。 <code>bench/laravel_request.php</code> / <code>bench/laravel_boot_bench.sh</code></p>
+<p class="note">計測環境: PHP 8.5（Docker・Debian bookworm）。他コンテナを停止したアイドル状態での実測で、絶対値・比とも他負荷の有無でほぼ不変（再現性あり）。再現: <code>docker compose exec app sh bench/laravel_boot_bench.sh 30 boot</code>（<code>request</code> でフルリクエスト）。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">②' 対比: 薄い自作スクリプトでは OPcache の効果が薄い（OFF vs ON・30回平均）</h3>
+<table>
+  <thead><tr><th>require するファイル数</th><th>OPcache OFF</th><th>OPcache ON<br><span class="note">(file_cache=FPM相当)</span></th><th>速度比</th><th>短縮</th></tr></thead>
+  <tbody>
+    <tr><td><strong>1 個</strong>（＝薄いスクリプト）</td><td>0.030 ms</td><td>0.036 ms</td><td>0.83×</td><td><strong>−0.006 ms</strong></td></tr>
+    <tr><td>50 個</td><td>0.199 ms</td><td>0.243 ms</td><td>0.82×</td><td><strong>−0.044 ms</strong></td></tr>
+    <tr><td>500 個</td><td>1.636 ms</td><td>1.891 ms</td><td>0.87×</td><td><strong>−0.255 ms</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">→ 関数 1 個だけの<strong>極小ファイル</strong>を N 個 require するだけの処理。Laravel と同じ計測方式（OFF＝毎回再コンパイル / ON＝<code>file_cache</code> でプロセス跨ぎ再利用）で別プロセス 30 回平均。<strong>どの行も ON は速くならない（むしろ僅かに遅い）</strong>。1 ファイルのコンパイルコストが極小なので OPcache が省ける分が無く、逆に <code>file_cache</code> から opcode を読み込むオーバーヘッドが上回るため。<strong>効くのはファイル「数」ではなくコンパイル「総量」（＝コード量）</strong>——500 個あっても中身が薄ければ効果は出ない。実 Laravel の 500 クラスは 1 つ 1 つに実コンパイルコストがあるから 2× になる、という上のカードとの対比。 <code>bench/thin_script.php</code> / <code>bench/thin_gen.php</code> / <code>bench/thin_bench.sh</code></p>
+<p class="note">計測環境: PHP 8.5（Docker・Debian bookworm）/ JIT は両条件とも無効固定。再現: <code>docker compose exec app sh bench/thin_bench.sh 30 "1 50 500"</code>。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">in_array vs isset / array_key_exists（PHPBench・mode）</h3>
+<table>
+  <thead><tr><th>処理</th><th>OPcache/JIT ON (mode)</th><th>rstdev</th><th>OPcache/JIT OFF</th><th>相対（ON基準）</th></tr></thead>
+  <tbody>
+    <tr><td>in_array (O(n))</td><td>11.753μs</td><td>±0.61%</td><td>11.877μs</td><td>基準</td></tr>
+    <tr><td>isset (O(1))</td><td>0.079μs</td><td>±4.18%</td><td>0.022μs</td><td><strong>約150倍速</strong></td></tr>
+    <tr><td>array_key_exists (O(1))</td><td>0.108μs</td><td>±5.69%</td><td>0.031μs</td><td><strong>約110倍速</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">→ 10,000要素の末尾を探索。<code>in_array</code> は線形 O(n)、<code>isset</code>/<code>array_key_exists</code> はハッシュ参照 O(1)。<strong>OPcache/JIT の ON・OFF で in_array はほぼ不変</strong>（11.8μs↔11.9μs・約1%差で誤差内）。いずれも内部関数／専用 opcode のため、差は完全に<strong>計算量由来</strong>で OPcache・JIT は無関係。 計測環境: PHP 8.5.7 / xdebug ❌（ON時 opcache ✔ / OFF時 opcache ❌）。再計測 2026-06-22。 <code>benchmarks/InArrayBench.php</code></p>
+<p class="note">isset / array_key_exists は1回が ~20〜100ns と極小のため rstdev が大きく（±4〜6%）、mode 推定もブレる（ON/OFF の前後が逆転しうる）。絶対値の僅差より、<strong>桁（in_array 比 約150倍 / 約110倍）</strong>で読むのが正しい。 ON: 既定設定 / OFF: <code>--php-config='opcache.enable_cli: 0'</code></p>
+<p class="note">総実行時間の目安（<code>revs × its = 2000 × 5 = 10,000回</code>分・mode×回数の概算）— <strong>ON / OFF</strong>: in_array <strong>約117.5ms / 約118.8ms</strong> ・ isset <strong>約0.79ms / 約0.22ms</strong> ・ array_key_exists <strong>約1.08ms / 約0.31ms</strong>。in_array は ON/OFF ほぼ同等（内部関数）。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">ネイティブ float 演算子 vs bcmath（PHPBench・mode）</h3>
+<table>
+  <thead><tr><th>処理</th><th>JIT ON</th><th>JIT OFF</th><th>JIT効果</th></tr></thead>
+  <tbody>
+    <tr><td>ネイティブ <code>*</code> <code>+</code>（float）</td><td>1.253μs</td><td>4.562μs</td><td><strong>約3.6倍速</strong></td></tr>
+    <tr><td>bcmath（<code>bcmul</code>/<code>bcadd</code>）</td><td>260.511μs</td><td>274.366μs</td><td>ほぼ差なし</td></tr>
+  </tbody>
+</table>
+<p class="note">→ 同じ「掛けて足す」を1000回繰り返すループ。<strong>ネイティブ演算子は言語opcodeなので JIT が効く</strong>（1.25μs↔4.56μs）。一方 <strong>bcmath は C実装の内部関数なので JIT 非対象</strong>（261μs↔274μs で大差なし）。しかも文字列ベースの任意精度演算ゆえ、ネイティブの<strong>約200倍</strong>遅い。「JITが効く境界＝opcode か C内部関数か」を最も鮮明に示す対比。 <code>benchmarks/BcmathBench.php</code> ／ 解説は <a href="jit.html">JITのしくみ</a></p>
+<p class="note">総実行時間（<code>revs × its = 200 × 5 = 1,000回</code>分、<code>sum(result_time_net)</code>）— <strong>JIT ON / OFF</strong>: ネイティブ <strong>1.30ms / 4.54ms</strong>（JITで約3.5倍）・ bcmath <strong>275.3ms / 267.6ms</strong>（差なし）。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">③ コールバックを取る標準関数（array_map / usort）— JITは効くか（PHPBench・mode）</h3>
+<table>
+  <thead><tr><th>処理</th><th>JIT ON</th><th>JIT OFF</th><th>JIT効果</th></tr></thead>
+  <tbody>
+    <tr><td>手書き foreach（完全 userland）</td><td>69.480μs</td><td>92.276μs</td><td><strong>約1.33倍速（~33%）</strong></td></tr>
+    <tr><td>array_map（コールバック userland）</td><td>131.720μs</td><td>156.356μs</td><td><strong>約1.19倍速（~19%）</strong></td></tr>
+    <tr><td>usort（比較コールバックを多数回）</td><td>2.501ms</td><td>2.854ms</td><td><strong>約1.14倍速（~14%）</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">→ <strong>標準関数でも、渡すコールバックは userland PHP opcode なので JIT が効く</strong>。ただし純粋な手書きループ（33%）より効果は小さい（19% / 14%）。これは実行時間の一部が <strong>C実装側（配列の反復・ソートアルゴリズム）に費やされ、そこは JIT 非対象</strong>だから。「userland 比率が高いほど JIT が効く」が綺麗に出ている。 <code>benchmarks/CallbackBench.php</code> ／ 解説は <a href="jit.html">JITのしくみ</a></p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">④ 正規表現の「もう一つの JIT」= PCRE JIT（PHPBench・mode）</h3>
+<table>
+  <thead><tr><th>処理</th><th>pcre.jit ON<br><span class="note">（既定）</span></th><th>pcre.jit OFF</th><th>opcache.jit OFF<br><span class="note">（pcre.jitは残す）</span></th></tr></thead>
+  <tbody>
+    <tr><td>preg_match ×2000</td><td>511.157μs</td><td><strong>4.440ms</strong></td><td>509.758μs</td></tr>
+    <tr><td>preg_match_all ×2000</td><td>1.187ms</td><td><strong>7.852ms</strong></td><td>1.205ms</td></tr>
+  </tbody>
+</table>
+<p class="note">→ <code>preg_*</code> は C(PCRE)実装なので <strong>opcache の JIT は無関係</strong>（右列：opcache JIT を切っても 509μs↔511μs で不変）。一方 PCRE は<strong>独自の JIT</strong>を持ち、<code>pcre.jit=0</code> にすると <strong>preg_match 約8.7倍 / preg_match_all 約6.6倍</strong>遅くなる。「PHPのJIT(opcache)」と「正規表現のJIT(PCRE)」は<strong>別物</strong>。標準関数で劇的な JIT 効果を出せる唯一格の題材。 <code>benchmarks/PcreJitBench.php</code> ／ 解説は <a href="jit.html">JITのしくみ</a></p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">⑤ 値オブジェクト演算（MoneyBench）— new あり・3 mode 比較</h3>
+<table>
+  <thead><tr><th>水準</th><th>JIT OFF</th><th>function (1205)</th><th>tracing (1254)</th><th>OFF→tracing</th></tr></thead>
+  <tbody>
+    <tr><td><strong>A: 生スカラー演算</strong>（<code>($i+$i)*2</code> をループ）</td><td>4.380μs</td><td>0.797μs</td><td><strong>0.697μs</strong></td><td><strong>約6.3倍速</strong></td></tr>
+    <tr><td>B: 型付き Money（<code>add</code>/<code>multiply</code> をループ）</td><td>186.756μs</td><td>148.075μs</td><td>129.513μs</td><td>約1.44倍速</td></tr>
+    <tr><td>C: 型なし MoneyLoose（B と同等処理）</td><td>159.023μs</td><td>120.581μs</td><td>100.255μs</td><td>約1.59倍速</td></tr>
+  </tbody>
+</table>
+<p class="note">→ N=1000・<code>@Revs(1000)</code> / 毎演算で <code>new Money(...)</code>。<strong>A はスカラー演算なので OPCODE が支配的で JIT が大きく効く（約6.3倍）</strong>。一方 B/C は <strong>毎回の <code>new</code> によるアロケーション / GC コストが支配的</strong>で、JIT 効果は 1.4〜1.6 倍にとどまる。注目すべきは <strong>B（型付き）が C（型なし）より遅い</strong>こと — <code>readonly</code> プロパティの代入時チェックが残るため。「型を付ければ JIT で速くなる」を単純化しすぎてはいけないことを示す題材。 <code>benchmarks/MoneyBench.php</code> ／ 計測日 2026-06-27 / PHP 8.5.7・PHPBench 1.7 mode</p>
+<p class="note">再現: <code>docker compose exec app vendor/bin/phpbench run benchmarks/MoneyBench.php --report=aggregate</code>（tracing）／ function 版は <code>--php-config='opcache.jit: function'</code> ／ OFF 版は <code>--php-config='opcache.jit_buffer_size: 0'</code>。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">⑥ アロケーションを排した純粋比較（HotLoopBench）— 型付き / 型なし × 3 mode</h3>
+<table>
+  <thead><tr><th>水準</th><th>JIT OFF</th><th>function (1205)</th><th>tracing (1254)</th><th>OFF→tracing</th></tr></thead>
+  <tbody>
+    <tr><td><strong>A: 生スカラー</strong>（プロパティ直読み・呼び出しなし）</td><td>28.617μs</td><td>7.755μs</td><td><strong>6.468μs</strong></td><td><strong>約4.4倍速</strong></td></tr>
+    <tr><td>B: 型付き TypedBox（<code>value()</code> をホットループ）</td><td>149.190μs</td><td>83.457μs</td><td>55.103μs</td><td>約2.7倍速</td></tr>
+    <tr><td>C: 型なし LooseBox（B と同等処理）</td><td>149.936μs</td><td>85.713μs</td><td>55.187μs</td><td>約2.7倍速</td></tr>
+  </tbody>
+</table>
+<p class="note">→ N=10000・<code>@Revs(100)</code> / インスタンスは <code>setUp</code> で 1 回だけ生成（毎反復のアロケーションを排除）。読み筋は 2 つ:<br>
+(1) <strong>同じ JIT ON でも function → tracing でさらに 2〜3 割速くなる</strong>（B: 83.5μs → 55.1μs）。tracing は <strong>関数境界を越えてホットな <code>value()</code> をインライン化</strong>できるため。<br>
+(2) <strong>型付き B と 型なし C の差はほぼ消える</strong>（tracing で 55.1μs vs 55.2μs）。tracing は <strong>観測した実行時型で特殊化</strong>するので、<code>int</code> が流れていれば宣言の有無は steady-state では効きにくい。「型を付ければ JIT で速い」の単純化への正直な反例。<br>
+A と B/C の差（6.5μs vs 55μs）はメソッド呼び出しフレームのコスト分。 <code>benchmarks/HotLoopBench.php</code> ／ 計測日 2026-06-27 / PHP 8.5.7・PHPBench 1.7 mode</p>
+<p class="note">再現: <code>docker compose exec app vendor/bin/phpbench run benchmarks/HotLoopBench.php --report=aggregate</code>（tracing）／ function: <code>--php-config='opcache.jit: function'</code> ／ OFF: <code>--php-config='opcache.jit_buffer_size: 0'</code>。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">⑦ 実践例：イベントソーシング型の入出金（TransferBench）— 連想配列 vs 型付き VO × 3 mode</h3>
+<table>
+  <thead><tr><th>履歴の表現</th><th>JIT OFF</th><th>function (1205)</th><th>tracing (1254)</th><th>OFF→tracing</th><th>mem_peak</th></tr></thead>
+  <tbody>
+    <tr><td>連想配列（<code>$history[] = [...]</code>）</td><td>543.583μs</td><td>460.089μs</td><td><strong>449.949μs</strong></td><td>約1.21倍速</td><td>8.57mb</td></tr>
+    <tr><td>型付き VO（<code>Account</code> / <code>TransactionEvent</code>）</td><td>1.122ms</td><td>907.395μs</td><td><strong>737.002μs</strong></td><td><strong>約1.52倍速</strong></td><td><strong>6.05mb</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">→ DB から SELECT した体裁の連想配列（日時・操作・金額・名称）5,000 件を入力に、1 件ずつ「出金者の合計から引いて出金履歴を記録 / 入金者の合計に足して入金履歴を記録」を回す。履歴の表現だけを 2 通りで実装して比較。読み筋は 3 つ:<br>
+(1) <strong>絶対値は連想配列の方が速い</strong>（tracing 450μs vs 737μs）。型付き VO は 1 件ごとに <code>new TransactionEvent</code>（アロケーション）＋メソッド呼び出しのコストが乗るため。<br>
+(2) <strong>JIT の改善率は型付き VO の方が大きい</strong>（OFF→tracing で 1.52倍 vs 1.21倍）。メソッド呼び出し・型付き演算が userland OPCODE として JIT の対象になるから。とくに <strong>function（907μs）→ tracing（737μs）の差が大きい</strong>＝ tracing が <code>withdraw</code>/<code>deposit</code> をインライン化できる。連想配列版は配列追記（<code>zend_hash</code>＝C実装）が支配的で function↔tracing がほぼ同じ。<br>
+(3) <strong>メモリは型付き VO の方が小さい</strong>（6.05mb vs 8.57mb）。連想配列は 1 イベントごとにキー文字列＋ハッシュ構造を持つため太る。 <code>benchmarks/TransferBench.php</code> / <code>Account.php</code> / <code>TransactionEvent.php</code> ／ 計測日 2026-06-28 / PHP 8.5.7・PHPBench 1.7 mode</p>
+<p class="note">再現: <code>docker compose exec app vendor/bin/phpbench run benchmarks/TransferBench.php --report=aggregate</code>（tracing）／ function: <code>--php-config='opcache.jit: function'</code> ／ OFF: <code>--php-config='opcache.jit_buffer_size: 0'</code>。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">⑧ 継承の深さ（InheritanceDispatchBench）— parent:: の連鎖 × 3 mode</h3>
+<table>
+  <thead><tr><th>継承の深さ</th><th>JIT OFF</th><th>function (1205)</th><th>tracing (1254)</th><th>OFF→tracing</th></tr></thead>
+  <tbody>
+    <tr><td><strong>継承なし</strong>（<code>final</code> に A+B+C 直書き）</td><td>2.649ms</td><td>1.872ms</td><td><strong>1.308ms</strong></td><td><strong>約2.03倍速</strong></td></tr>
+    <tr><td>1 段継承（<code>parent::</code> 1 回）</td><td>2.837ms</td><td>2.069ms</td><td>1.469ms</td><td>約1.93倍速</td></tr>
+    <tr><td>3 段継承（Abstract→Mid→Deep）</td><td>3.312ms</td><td>2.348ms</td><td><strong>1.620ms</strong></td><td>約2.04倍速</td></tr>
+  </tbody>
+</table>
+<p class="note">→ N=20000・<code>@Revs(300)</code> / 同じ <code>score()</code> 計算（step A=金額×係数 / B=payer 重み / C=payee 重み）を、継承の深さだけ変えた 3 実装で比較。3 実装は<strong>同じ値を返す</strong>（合計 70,210,000 で一致を検証済み）ので、差分は <code>parent::</code> の呼び出しフレームぶんだけ。読み筋は 2 つ:<br>
+(1) <strong>JIT は継承チェーンにも効く</strong>（どの深さでも OFF→tracing 約2倍速）。<code>parent::</code> の連鎖も userland OPCODE なので前段のポリモーフィズム（interface）と同様に JIT の対象になる。とくに <strong>function→tracing の伸びが大きい</strong>＝ tracing が親メソッドをまたいでインライン化する。<br>
+(2) <strong>継承の深さ＝呼び出しフレームのコストは JIT 後も残る</strong>（tracing でも 1.308 → 1.469 → 1.620ms と段ごとに増える）。イミュータブルの「生成コストは残る」と同じ論調で、JIT は呼び出しを速くするが <code>parent::</code> の連鎖フレーム自体は消えない。 <code>benchmarks/InheritanceDispatchBench.php</code> / <code>AbstractInheritanceScorer.php</code> ほか ／ 計測日 2026-07-02 / PHP 8.5.7・PHPBench 1.7 mode</p>
+<p class="note">再現: <code>docker compose exec app vendor/bin/phpbench run benchmarks/InheritanceDispatchBench.php --report=aggregate</code>（tracing）／ function: <code>--php-config='opcache.jit: function'</code> ／ OFF: <code>--php-config='opcache.jit_buffer_size: 0'</code>。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">⑨ 値オブジェクトの等価判定（CompareBench）— getter 直比較 vs equal() × 3 mode（DDD 風）</h3>
+<table>
+  <thead><tr><th>水準</th><th>ドメイン操作</th><th>比較の中身</th><th>JIT OFF</th><th>function (1205)</th><th>tracing (1254)</th></tr></thead>
+  <tbody>
+    <tr><td>D1</td><td>getter 直比較 <code>===</code></td><td><code>amount() === amount()</code></td><td>54ns</td><td>27ns</td><td><strong>26ns</strong></td></tr>
+    <tr><td><strong>D2</strong></td><td><code>equal()</code> メソッド</td><td><code>$priceA-&gt;equal($priceB)</code></td><td>43ns</td><td>28ns</td><td><strong>27ns</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">→ <code>@Revs(10000000)</code> / 題材を DDD 風の「値オブジェクトの等価判定」に。<code>Money</code>（型付き int VO）の金額一致を <strong>2 通りの書き方</strong>で比較する。D1 は呼び出し側で getter（<code>amount()</code>）を 2 回叩いて生の int を <code>===</code> で突き合わせる。D2 は VO にカプセル化した <code>equal()</code> メソッド（中身は <code>$this-&gt;amount === $o-&gt;amount</code>）を 1 回呼ぶ。値はプロパティ経由で渡し（リテラル直書きは定数畳み込みで比較自体が消えうる）、結果は <code>$sink</code> に残して DCE を防ぐ。読み筋は 2 つ:<br>
+(1) <strong>JIT ありなら D1 ≒ D2</strong>。tracing で <strong>26〜27ns</strong> に揃う＝<code>equal()</code> の呼び出しを JIT がインライン化し、getter アクセスもプロパティのスロットアクセスに落ちて、どちらも同じ整数比較命令に特殊化される。<strong>メソッドで包んでもコストはゼロ</strong>。<br>
+(2) <strong>JIT OFF ではむしろ <code>equal()</code> が速い</strong>（D1 54ns / D2 43ns）。getter を 2 回呼ぶより、1 回のメソッド呼び出しでプロパティを 2 つ読むほうが関数フレームが少ないため。結論: <strong>速さのために getter を晒す必要はなく、VO に <code>equal()</code> を持たせる設計を選んでよい</strong>。 <code>benchmarks/CompareBench.php</code> / <code>Money.php</code> ／ 計測日 2026-07-04 / PHP 8.5.7・PHPBench 1.7 mode</p>
+<p class="note">再現: <code>docker compose exec app vendor/bin/phpbench run benchmarks/CompareBench.php --report=aggregate</code>（tracing）／ function: <code>--php-config='opcache.jit: function'</code> ／ OFF: <code>--php-config='opcache.jit_buffer_size: 0'</code>。</p>
+</div>
+
+<div class="pager">
+  <a href="benchmarks.html">← ベンチ &amp; 実行</a>
+  <a href="jit.html">次へ: JITのしくみ →</a>
+</div>
+</div>
+</body>
+</html>

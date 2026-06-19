@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JITのしくみ — performance-php</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top">
+  <a href="index.html">トップ</a>
+  <a href="stack.html">基本スタック</a>
+  <a href="measure-tools.html">計測ツール</a>
+  <a href="benchmarks.html">ベンチ &amp; 実行</a>
+  <a href="results.html">計測結果</a>
+  <a href="jit.html" aria-current="page">JITのしくみ</a>
+  <a href="report-reading.html">レポートの読み方</a>
+  <a href="presentation-outline.html">構成案</a>
+</nav>
+<div class="wrap">
+
+<header class="page">
+  <h1>JITのしくみ — なぜ Math で効いて in_array で効かないのか</h1>
+  <div class="sub">JIT が「何をコンパイルするか」で効き方が決まる</div>
+</header>
+
+<h2>一言で</h2>
+<div class="card">
+  <p style="margin:.2rem 0"><code>MathBench</code> は <strong>PHPで書いたタイトな数値ループ＝インタプリタが opcode を1個ずつ実行する処理</strong>。JIT はその opcode 列を<strong>ネイティブの機械語に変換</strong>するので速くなる。</p>
+  <p style="margin:.6rem 0 .2rem">一方 <code>in_array</code> などの内部関数は<strong>最初から C で書かれた機械語</strong>。JIT が触るのは「あなたのPHPの opcode」であって「組み込み関数の C 実装」ではないので、効かない。</p>
+</div>
+
+<h2>JIT が効く3条件（MathBench は全部満たす）</h2>
+
+<h3>① ユーザーランドPHPのループであること</h3>
+<p><code>MathBench</code> は <code>for</code> の二重ループ（外2000 × 内最大100）で、<strong>最大20万回の演算が PHP opcode として回る</strong>。JIT はこの opcode 列をまとめて機械語化し、<strong>VMのディスパッチ（fetch→decode→execute を1 opcodeごとに繰り返す）オーバーヘッドを消す</strong>。
+<br>対して <code>in_array</code> は、PHP側は <code>in_array(...)</code> という<strong>たった1つの呼び出し opcode</strong>。中身の線形探索は C の中なので、JIT がコンパイルできる PHP opcode がほぼ無い＝効きようがない。</p>
+
+<h3>② 数値（float）演算が主であること</h3>
+<p>PHPの変数は <code>zval</code>（型タグ付きの箱）。インタプリタは演算のたびに<strong>型チェック＋箱の出し入れ（boxing/unboxing）</strong>をする。JIT（特に tracing JIT）は「この変数はずっと <code>double</code> だ」と特定できると、<strong>値をCPUレジスタにネイティブの double として置き、生の FPU/SSE 命令を直接発行</strong>する。zval の手間が丸ごと消えるので、ここが最大の伸びしろ。</p>
+
+<h3>③ ループ中に外部呼び出し・I/Oが無いこと</h3>
+<p><code>MathBench</code> の中身は四則演算と分岐だけ。C関数呼び出しもI/Oもないので、JIT化したコードが<strong>中断なく走り続けられる</strong>。</p>
+
+<h2>効くかどうかの本質</h2>
+<p>「<strong>useful work に対するインタプリタ・オーバーヘッドの比率</strong>」で決まる。</p>
+<table>
+  <thead><tr><th></th><th>1 opcode あたりの仕事</th><th>インタプリタ下駄の比率</th><th>JIT</th></tr></thead>
+  <tbody>
+    <tr><td>数値ループ（MathBench）</td><td>小（add 1回など）</td><td><strong>大</strong>（下駄が支配的）</td><td>✅ 効く</td></tr>
+    <tr><td>内部関数呼び出し（in_array）</td><td>大（1呼び出しで全走査）</td><td>小（下駄は誤差）</td><td>❌ 効かない</td></tr>
+  </tbody>
+</table>
+<p class="note">数値ループは「1 opcode の仕事が小さいのに、毎回ディスパッチの固定コストを払う」ので下駄が支配的 → JIT がそれを消すと大きく速くなる（実測 <strong>409μs → 1.82ms、約4.5倍</strong>）。in_array は「1 opcode（=1呼び出し）で1万件走査」と仕事が大きく、下駄は元から誤差 → JIT の出番なし。</p>
+
+<h2>最も鮮明な実例: ネイティブ演算子 vs bcmath</h2>
+<p>同じ「掛けて足す」ループを2方式で実装すると、JITの境界がそのまま出る。</p>
+<table>
+  <thead><tr><th>処理</th><th>JIT ON</th><th>JIT OFF</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td>ネイティブ <code>*</code> <code>+</code>（float）</td><td>1.253μs</td><td>4.562μs</td><td>言語opcode → <strong>JITが効く（約3.6倍）</strong></td></tr>
+    <tr><td>bcmath（<code>bcmul</code>/<code>bcadd</code>）</td><td>260.511μs</td><td>274.366μs</td><td>C実装の内部関数 → <strong>JIT非対象（不変）</strong></td></tr>
+  </tbody>
+</table>
+<p class="note">演算子は opcode なので JIT が機械語化できるが、<code>bcmul()</code> は <code>in_array()</code> と同じ「C実装の組み込み関数」。だから JIT は効かず、さらに文字列ベースの任意精度ゆえネイティブの<strong>約200倍</strong>遅い。 <code>benchmarks/BcmathBench.php</code></p>
+
+<h2>標準関数でも JIT が効く2パターン</h2>
+
+<h3>① コールバックを取る標準関数（array_map / usort）</h3>
+<p>標準関数の本体は C でも、<strong>渡すコールバックは userland PHP opcode</strong>。だからそこに JIT が効く。</p>
+<table>
+  <thead><tr><th>処理</th><th>JIT ON</th><th>JIT OFF</th><th>JIT効果</th></tr></thead>
+  <tbody>
+    <tr><td>手書き foreach（完全 userland）</td><td>69.480μs</td><td>92.276μs</td><td>約1.33倍（~33%）</td></tr>
+    <tr><td>array_map（コールバック）</td><td>131.720μs</td><td>156.356μs</td><td>約1.19倍（~19%）</td></tr>
+    <tr><td>usort（比較コールバック多数回）</td><td>2.501ms</td><td>2.854ms</td><td>約1.14倍（~14%）</td></tr>
+  </tbody>
+</table>
+<p class="note">純手書きループ（33%）より効果が小さいのは、時間の一部が C側（配列反復・ソート）に費やされ JIT 非対象だから。「<strong>userland 比率が高いほど JIT が効く</strong>」がそのまま出ている。 <code>benchmarks/CallbackBench.php</code></p>
+
+<h3>② 正規表現の「もう一つの JIT」= PCRE JIT</h3>
+<p><code>preg_*</code> は C(PCRE)実装なので <strong>opcache の JIT は効かない</strong>。だが PCRE は<strong>独自の JIT</strong>を持ち、ini の <code>pcre.jit</code>（既定ON）で制御する。これは opcache の JIT とは<strong>別物</strong>。</p>
+<table>
+  <thead><tr><th>処理</th><th>pcre.jit ON</th><th>pcre.jit OFF</th><th>opcache.jit OFF</th></tr></thead>
+  <tbody>
+    <tr><td>preg_match ×2000</td><td>511μs</td><td><strong>4.440ms</strong></td><td>510μs</td></tr>
+    <tr><td>preg_match_all ×2000</td><td>1.187ms</td><td><strong>7.852ms</strong></td><td>1.205ms</td></tr>
+  </tbody>
+</table>
+<p class="note"><code>pcre.jit=0</code> で <strong>約8.7倍 / 約6.6倍</strong>遅くなる一方、<strong>opcache の JIT を切っても不変</strong>（右列）。＝「効いているのは PCRE JIT であって opcache JIT ではない」。PHPには<strong>複数の独立した JIT</strong>がある、という点に注意。 <code>benchmarks/PcreJitBench.php</code></p>
+
+<h2>まとめ</h2>
+<div class="card">
+  <p style="margin:.2rem 0"><strong>JIT = PHPの opcode を機械語化する仕組み</strong>。だから——</p>
+  <ul style="margin:.4rem 0; padding-left:1.2rem;">
+    <li>PHPで書いた<strong>計算ループ</strong>（MathBench）には効く</li>
+    <li>C実装の<strong>組み込み関数</strong>（in_array / array_diff / array_unique）には効かない</li>
+    <li>「速い/遅い」の本質は多くの場合 <strong>計算量（O(n) vs O(1)）</strong>であり、そこに OPcache も JIT も無関係</li>
+  </ul>
+  <p class="note" style="margin:.4rem 0 0">→ 実測の裏付けは <a href="results.html">計測結果</a> を参照。</p>
+</div>
+
+<div class="pager">
+  <a href="results.html">← 計測結果</a>
+  <a href="report-reading.html">次へ: レポートの読み方 →</a>
+</div>
+</div>
+</body>
+</html>

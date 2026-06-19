@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>プレゼン構成案 — performance-php</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top">
+  <a href="index.html">トップ</a>
+  <a href="stack.html">基本スタック</a>
+  <a href="measure-tools.html">計測ツール</a>
+  <a href="benchmarks.html">ベンチ &amp; 実行</a>
+  <a href="results.html">計測結果</a>
+  <a href="jit.html">JITのしくみ</a>
+  <a href="report-reading.html">レポートの読み方</a>
+  <a href="presentation-outline.html" aria-current="page">構成案</a>
+</nav>
+<div class="wrap">
+
+<header class="page">
+  <h1>プレゼンテーション構成案</h1>
+  <div class="sub">OPcache・JIT が効くコード/効かないコードを、作って測って確かめる</div>
+</header>
+
+<h2>プロポーザル案（転記）</h2>
+<p class="note">プロポーザル案をそのまま転記したもの（誤字含む）。</p>
+<div class="card">
+  <p style="margin:.2rem 0"><strong>OPcache・JIT が効くコード/効かないコードを、作って測って確かめる</strong><br>
+  ma_mema@me<br>
+  &nbsp;ma_me</p>
+
+  <h3 style="margin-top:1rem">概要</h3>
+  <p style="margin:.2rem 0">PHP8.0 で導入された OPcache と JIT は、現在も改善が続いています。
+  その一方で両方ともデフォルト設定のまま運用しているケースは多々あり、それぞれの特性を活かせていると言い切れる現場も多くないはずです。
+  例えば計算量について、 in_array より isset のほうが速い、といった断片的な知識は広く知られていますが
+  なぜ isset のほうが速いのか、そこに OPcache や JIT は効くのか、といった踏み込んだ理解はあまり共有されていません。
+  本セッションでは、こうしたなんとなく知っていることを、どこに、どう効くのかを測って確かめたに置き換えることが目的としています。</p>
+
+  <h3>話すこと</h3>
+  <ul style="margin:.4rem 0; padding-left:1.2rem;">
+    <li>PHP 標準関数や言語機能を計算量で選ぶ視点（in_array / isset / array_unique など）</li>
+    <li>OPcache・JIT の設定がパフォーマンスに与える影響</li>
+    <li>計測と実際の計測結果</li>
+  </ul>
+
+  <h3>話さないこと</h3>
+  <ul style="margin:.4rem 0; padding-left:1.2rem;">
+    <li>OPcache、JITの踏み込んだ内部実装の話</li>
+    <li>JIT コンパイラ自体の理論的背景</li>
+  </ul>
+</div>
+
+<h2>構成案（たたき台）</h2>
+<p class="note">プロポーザルをもとにしたセッションの流れ。各パートはこのリポジトリのベンチ／ドキュメントに紐づけてある（確定ではない）。</p>
+
+<table>
+  <thead><tr><th style="width:2.5rem">#</th><th>パート</th><th>狙い・メッセージ</th><th>裏付け（このリポジトリ）</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>つかみ / 自己紹介</td>
+      <td>「<code>in_array</code> より <code>isset</code> が速い」——<strong>なぜ?</strong> そこに OPcache / JIT は効くのか? を問いとして提示。</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>前提合わせ：OPcache と JIT は別物</td>
+      <td>OPcache＝opcodeのキャッシュ、JIT＝opcodeの機械語化。両方デフォルト運用が多い現実。</td>
+      <td><a href="stack.html">基本スタック</a> / <a href="jit.html">JITのしくみ</a></td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>計測の土台</td>
+      <td>「測って確かめる」ための環境・ツール・JIT切替方法を先に共有。再現可能性の担保。</td>
+      <td><a href="measure-tools.html">計測ツール</a> / <a href="benchmarks.html">ベンチ &amp; 実行</a> / <a href="report-reading.html">レポートの読み方</a></td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>第1部：計算量で選ぶ視点</td>
+      <td><code>in_array</code> O(n) vs <code>isset</code> / <code>array_key_exists</code> O(1)。<strong>速さの本質は計算量</strong>で、ここに OPcache も JIT も無関係。</td>
+      <td><a href="results.html">計測結果</a> / <code>benchmarks/InArrayBench.php</code></td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>第2部：JITが<strong>効く</strong>コード</td>
+      <td>純粋な数値ループ（userland opcode）は機械語化で大きく伸びる（約4.5倍）。</td>
+      <td><a href="jit.html">JITのしくみ</a> / <code>benchmarks/MathBench.php</code></td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>第3部：JITが<strong>効かない</strong>コード</td>
+      <td>C実装の組み込み関数（<code>in_array</code> / <code>array_unique</code> / <code>bcmath</code>）には効かない。形ではなく中身が opcode か C関数かで決まる。</td>
+      <td><code>benchmarks/BcmathBench.php</code> / <code>ArrayUniqueBench.php</code></td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>第4部：標準関数でも効く2パターン</td>
+      <td>① コールバック（<code>array_map</code> / <code>usort</code>）は中身が userland。② 正規表現は <strong>PCRE JIT</strong>（opcacheのJITとは別物）。PHPには複数のJITがある。</td>
+      <td><code>benchmarks/CallbackBench.php</code> / <code>PcreJitBench.php</code></td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>第5部：設定がパフォーマンスに与える影響</td>
+      <td><code>opcache.jit</code> / <code>jit_buffer_size</code> / <code>validate_timestamps</code> などの切替で実測がどう動くか。デフォルトのままで良いのか。</td>
+      <td>README「OPcache / JIT 設定の切替」 / <code>/perf/status</code></td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>まとめ</td>
+      <td>「速い/遅い」の本質は多くの場合<strong>計算量</strong>。JIT が効くのは userland opcode のループ。<strong>どこに・どう効くか</strong>を測って確かめた。</td>
+      <td><a href="jit.html#まとめ">JITのしくみ：まとめ</a></td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>話さないこと（明示）</td>
+      <td>OPcache / JIT の内部実装、JITコンパイラの理論的背景には踏み込まない、と最後に再確認。</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="card">
+  <h3 style="margin-top:0">本セッションの一本柱</h3>
+  <p style="margin:.2rem 0">「<strong>なんとなく知っている</strong>」を「<strong>どこに・どう効くかを測って確かめた</strong>」に置き換える。<br>
+  軸は3つ：<strong>計算量</strong>（O(n) vs O(1)）／<strong>opcode か C関数か</strong>（JITの境界）／<strong>設定</strong>（デフォルトのままで良いのか）。</p>
+</div>
+
+<footer>performance-php — このページは <code>public/docs/presentation-outline.html</code>。元データは <code>docs/presentation-outline.md</code>。</footer>
+
+<div class="pager">
+  <a href="report-reading.html">← レポートの読み方</a>
+  <a href="index.html">トップへ →</a>
+</div>
+</div>
+</body>
+</html>

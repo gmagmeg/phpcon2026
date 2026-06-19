@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JIT と OPcache を「正しく」期待する — 構成確認</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161922;
+    --border: #2a2f3a;
+    --fg: #e6e9ef;
+    --muted: #9aa3b2;
+    --accent: #42affa;
+    --accent2: #7ee787;
+    --code-bg: #1b1f29;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Segoe UI", sans-serif;
+    line-height: 1.75;
+    font-size: 16px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 48px 24px 120px; }
+
+  .hero {
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 24px;
+    margin-bottom: 8px;
+  }
+  .hero h1 { font-size: 2em; margin: 0 0 8px; line-height: 1.3; }
+  .hero .sub { color: var(--accent); font-size: 1.05em; margin: 0 0 4px; font-weight: 600; }
+  .hero .lead { color: var(--muted); font-size: 0.95em; }
+
+  section.part {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px 28px 24px;
+    margin: 28px 0;
+  }
+  section.part > h2 {
+    font-size: 1.35em;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+    margin-top: 28px;
+  }
+  h3 { font-size: 1.08em; color: var(--accent2); margin-top: 26px; }
+  h4 { font-size: 0.98em; color: var(--muted); margin: 18px 0 6px; text-transform: none; letter-spacing: .02em; }
+
+  ul, ol { padding-left: 1.4em; }
+  li { margin: 4px 0; }
+  li > ul { margin-top: 4px; }
+
+  strong { color: #fff; }
+  em { color: var(--accent); font-style: normal; }
+
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.85em;
+    color: #ffd479;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+  }
+  pre code { background: none; border: none; padding: 0; color: #cdd3df; }
+
+  blockquote {
+    margin: 14px 0;
+    padding: 10px 18px;
+    border-left: 4px solid var(--accent);
+    background: rgba(66,175,250,.08);
+    color: #d6e7f5;
+    border-radius: 0 6px 6px 0;
+  }
+  blockquote p { margin: 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 0.92em;
+  }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: #1d212c; color: var(--accent); }
+
+  hr { display: none; }
+
+  .takeaways { counter-reset: t; list-style: none; padding-left: 0; }
+  .takeaways li {
+    counter-increment: t;
+    position: relative;
+    padding-left: 38px;
+    margin: 10px 0;
+  }
+  .takeaways li::before {
+    content: counter(t);
+    position: absolute; left: 0; top: 1px;
+    width: 26px; height: 26px;
+    background: var(--accent); color: #07151f;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: .85em;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: .72em;
+    background: #243044;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+    font-weight: 600;
+  }
+  .note { color: var(--muted); font-size: .88em; }
+
+  /* table of contents */
+  nav.toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 22px;
+    margin: 24px 0;
+  }
+  nav.toc h2 { font-size: .95em; color: var(--muted); margin: 4px 0 10px; border: none; }
+  nav.toc ol { margin: 0; }
+  nav.toc a { color: var(--fg); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+
+  /* practical highlight block */
+  .practice {
+    border: 1px solid #2e6f3f;
+    background: rgba(126,231,135,.06);
+    border-radius: 10px;
+    padding: 4px 22px 18px;
+    margin: 22px 0;
+  }
+  .practice > h3 { color: var(--accent2); margin-top: 20px; }
+  .practice .star { color: #ffd479; }
+  .matrix th { background: #1c2a20; color: var(--accent2); }
+  pre.lang::before {
+    content: attr(data-lang);
+    display: block;
+    color: var(--muted);
+    font-size: .72em;
+    margin-bottom: 6px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <h1>JIT と OPcache を「正しく」期待する</h1>
+    <p class="sub">PHP 高速化の効きどころ</p>
+    <p class="lead">「JIT を入れれば速くなる」は半分しか正しくない。何が速くなり、何が速くならないのかを計測で見極める。</p>
+    <p class="note">元アウトライン: outline.md / 構成確認用ドキュメント</p>
+  </header>
+
+  <nav class="toc">
+    <h2>目次</h2>
+    <ol>
+      <li><a href="#s1">イントロ / 前提合わせ</a></li>
+      <li><a href="#s4">OPcache が効くケース（まず軽く）</a></li>
+      <li><a href="#s2">計測の枠組み</a></li>
+      <li><a href="#s3">では JIT はどこで効くのか</a></li>
+      <li><a href="#s5">まとめ — レイヤーで考える</a></li>
+      <li><a href="#appendix">付録 / 質疑ストック</a></li>
+    </ol>
+  </nav>
+
+  <section class="part" id="s1">
+    <h2>1. イントロ / 前提合わせ <span class="tag">つかみ</span></h2>
+    <ul>
+      <li>自己紹介は最小限。このトークのゴールを最初に宣言する:
+        <ul>
+          <li>JIT / OPcache がそれぞれ「どこに効くのか」を、<strong>雰囲気ではなく計測で</strong>理解する。</li>
+          <li>「JIT 入れたのに速くならない」の正体を理解して帰ってもらう。</li>
+        </ul>
+      </li>
+    </ul>
+
+    <h3>PHP 実行の流れ</h3>
+<pre><code>PHP ソース
+  → 字句 / 構文解析
+  → OPCODE（中間表現）
+  → Zend VM が実行</code></pre>
+    <ul>
+      <li><strong>OPcache</strong> … コンパイル結果（OPCODE）をメモリにキャッシュし、毎リクエストの「ソース→OPCODE」変換を省く。= <strong>コンパイルコストの削減</strong>であって、実行そのものを速くするわけではない。</li>
+      <li><strong>JIT</strong>（PHP 8.0+） … OPCODE を実行時にネイティブ機械語へ変換し、Zend VM のディスパッチを飛ばす。OPcache の上に乗っている（JIT を使うには OPcache が前提）。</li>
+    </ul>
+
+    <h4>結論を先出し（先に地図を見せる）</h4>
+    <ul>
+      <li><em>OPcache</em> … コード量が多いほど効く（= フレームワーク・大規模アプリ向き）。</li>
+      <li><em>JIT</em> … OPCODE 計算が支配的な処理に効く（= 数値計算・ドメインロジック向き）。</li>
+      <li>両者は競合せず、<strong>レイヤーで役割分担</strong>する。</li>
+    </ul>
+    <p class="note">ここで「じゃあ JIT 入れれば何でも速いのでは？」という素朴な期待を一度持たせる → 後半の計測で裏切る。</p>
+  </section>
+
+  <section class="part" id="s4">
+    <h2>2. OPcache が効くケース <span class="tag">まず軽く片付ける</span></h2>
+    <p>OPcache は話が単純なので <strong>先に片付ける</strong>。効果は <strong>コード量（コンパイル対象の規模）にほぼ比例</strong>する ―― 実行を速くするのではなく、毎リクエストの「ソース→OPCODE」変換を省くだけ。</p>
+    <ul>
+      <li>薄い自作スクリプト … コンパイルコストが元々小さい → <strong>効果も薄い</strong>。</li>
+      <li>大量のクラス / ファイルを読む … 省略が積み上がる → <strong>大きい</strong>。</li>
+    </ul>
+
+    <h3>★ 一番効く例: Laravel（フレームワーク）</h3>
+    <ul>
+      <li>Laravel は <strong>1 リクエストで約 500 ファイル / 500 クラス</strong>をロード・コンパイルする（実測: welcome ページで included <strong>519</strong> ファイル・declared <strong>511</strong> クラス）。これを毎回コンパイルし直すコストが支配的。</li>
+      <li>OPcache ON なら、この「ソース→OPCODE」変換を <strong>初回 1 回だけ</strong>に圧縮。だから <strong>フレームワークほど受益が大きい</strong>。</li>
+    </ul>
+
+    <h4>計測結果（実測 / Docker・PHP 8.5 / 1 リクエストのブート時間・30 回平均）</h4>
+    <p class="note">同一の Laravel リクエスト処理（約 500 ファイル）を、OPcache OFF と ON（コンパイル済み opcode を <code>file_cache</code> でプロセス跨ぎ再利用＝FPM 相当）で比較。</p>
+    <table class="matrix">
+      <tr><th>構成</th><th>1 リクエストのブート</th><th>比</th></tr>
+      <tr><td>OPcache OFF</td><td>92.70 ms</td><td>1.0×（基準）</td></tr>
+      <tr><td>OPcache ON</td><td><strong>41.53 ms</strong></td><td><strong>約 2.2× 速い</strong>（約 51ms 短縮）</td></tr>
+    </table>
+    <blockquote><p><strong>メッセージ:</strong> OPcache は「実行」ではなく「<strong>毎回のコンパイル</strong>」を省く。コード量が多い <strong>フレームワークが最大の受益者</strong>で、薄いスクリプトでは効果は小さい。ここだけ押さえたら本題（JIT）へ。</p></blockquote>
+  </section>
+
+  <section class="part" id="s2">
+    <h2>3. 計測の枠組み <span class="tag">前提</span></h2>
+    <ul>
+      <li>ツール: <strong>PHPBench</strong> を使用。<code>@Revs</code> / <code>@Iterations</code> の意味を一言。</li>
+      <li>比較軸: <strong>JIT OFF vs JIT ON</strong>、さらに <strong>JIT mode（function vs tracing）</strong>（<code>opcache.jit</code> で指定）。</li>
+      <li>原則: JIT が速くするのは <strong>OPCODE の実行部分</strong>。標準関数や IO の中身（ネイティブ C）は速くできない。<strong>計算が OPCODE で表現される処理</strong>を狙う。</li>
+    </ul>
+
+    <h3>3-1. <code>opcache.jit</code> の設定値（<code>CRTO</code>）と最大の落とし穴</h3>
+    <ul>
+      <li><strong>デフォルトは実質 OFF</strong>。PHP 8 以降 <code>opcache.jit</code> のデフォルトは <code>tracing</code> だが、<strong><code>opcache.jit_buffer_size</code> のデフォルトが <code>0</code></strong>。バッファが 0 だと mode を何にしても <strong>JIT は動かない</strong>。「8.0 にしたから JIT 効いてるはず」が外れる最大要因。</li>
+      <li>CLI（PHPBench はこれ）は <strong><code>opcache.enable_cli=1</code></strong> が別途必要。FPM とは別 ini。</li>
+    </ul>
+<pre class="lang" data-lang="ini — 最低限の設定"><code>opcache.enable=1
+opcache.enable_cli=1
+opcache.jit=tracing
+opcache.jit_buffer_size=128M   ; ← これを明示しないと JIT は無効</code></pre>
+    <p><code>opcache.jit</code> の値は <strong>4 桁 <code>CRTO</code></strong> で、<code>tracing</code> / <code>function</code> はそのエイリアス。</p>
+    <table>
+      <tr><th>桁</th><th>意味</th><th>主な値</th></tr>
+      <tr><td><strong>C</strong> (CPU)</td><td>CPU 固有最適化</td><td>0=なし / 1=AVX</td></tr>
+      <tr><td><strong>R</strong> (Register)</td><td>レジスタ割り付け</td><td>0=なし / 1=ブロック局所 / 2=グローバル</td></tr>
+      <tr><td><strong>T</strong> (Trigger)</td><td><strong>いつ compile するか</strong></td><td>0=ロード時に全関数 / 1=初回実行 / 3=実行中のホット関数 / <strong>5=トレーシング</strong></td></tr>
+      <tr><td><strong>O</strong> (Optimization)</td><td>最適化レベル</td><td>1=最小 … 4=コールツリー / 5=手続き内解析</td></tr>
+    </table>
+    <table>
+      <tr><th>別名</th><th>数値</th><th>T（トリガ）</th></tr>
+      <tr><td><code>function</code></td><td><code>1205</code></td><td>0（関数単位で全 compile）</td></tr>
+      <tr><td><code>tracing</code></td><td><code>1254</code></td><td>5（ホットな trace を compile）</td></tr>
+      <tr><td><code>on</code></td><td>=<code>tracing</code></td><td></td></tr>
+      <tr><td><code>off</code> / <code>disable</code></td><td>—</td><td>無効</td></tr>
+    </table>
+    <blockquote><p>言い方: 「<code>function</code> の <code>0</code> と <code>tracing</code> の <code>5</code> ＝ <strong>第 3 桁（トリガ）の違い</strong>が本質。残りはほぼ同じ」。</p></blockquote>
+
+    <h3>3-2. function JIT と tracing JIT の違い</h3>
+    <ul>
+      <li><strong>function JIT</strong>（T=0）… 関数を <strong>まるごと</strong> 機械語化。境界は 1 関数単位で、ホットかどうかに関係なく対象。</li>
+      <li><strong>tracing JIT</strong>（T=5）… まず VM で実行しながらプロファイルし、<strong>ホットな実行経路（trace）</strong> だけを compile する。trace は <strong>関数境界を越えて</strong> 伸びるのが肝:
+        <ul>
+          <li>ループ内で繰り返し呼ばれるメソッドを <strong>インライン化</strong> してひと続きの機械語にできる。</li>
+          <li>実際に観測した型（「ここは常に <code>int</code>」）で <strong>特殊化</strong> できる。</li>
+          <li>実行されない分岐はそもそも compile しない。</li>
+        </ul>
+      </li>
+      <li>だから「ホットループ＋メソッド呼び出し」では <strong>tracing が function を上回る</strong>（4-5 で実測）。4-2 の「型付き値オブジェクトが効く」話も tracing 前提。</li>
+      <li>閾値設定: <code>opcache.jit_hot_loops</code> / <code>jit_hot_func</code> などで「何回でホットと見なすか」を制御。マイクロベンチで効果が出ないときはこことウォームアップを疑う。</li>
+    </ul>
+
+    <h4>実務上のトレードオフ（どちらを選ぶか）</h4>
+    <table>
+      <tr><th>観点</th><th>function (T=0)</th><th>tracing (T=5)</th></tr>
+      <tr><td>compile タイミング</td><td>ロード時に全関数を一括</td><td>実行を観測し、ホットな trace を後から</td></tr>
+      <tr><td>ウォームアップ</td><td><strong>不要</strong>（最初から効く）</td><td><strong>必要</strong>（ホット検出までは素の VM）</td></tr>
+      <tr><td>compile 範囲 / メモリ</td><td>全関数 → buffer 消費が大きい</td><td>ホット経路のみ → 小さく済む</td></tr>
+      <tr><td>最適化の質</td><td>関数単位どまり</td><td>関数境界を越えてインライン化・実型で特殊化</td></tr>
+      <tr><td>得意</td><td>起動直後から効かせたい</td><td>ホットループ・長時間プロセス（FPM 常駐・ワーカー）</td></tr>
+      <tr><td>不利</td><td>ホットループの特殊化は弱い</td><td><strong>短命・単発処理は warmup を回収できない</strong></td></tr>
+    </table>
+    <blockquote><p><strong>損益分岐:</strong> 長く回るホットパスがあるなら tracing（本トークの数値計算・ドメイン層はこちら）。一方、<strong>短命 CLI や 1 回こっきりの処理</strong>では tracing の warmup コストが回収できず、function や素の VM の方が相対的に有利になりうる。「常に tracing が最速」ではない。</p></blockquote>
+  </section>
+
+  <section class="part" id="s3">
+    <h2>4. では JIT はどこで効くのか <span class="tag">本題</span></h2>
+
+    <h3>4-1. ケース①: 四則演算 / bcmath</h3>
+    <ul>
+      <li>四則演算は <strong>OPCODE そのもの</strong>（<code>ADD</code> / <code>MUL</code> など）→ JIT がネイティブ命令に置き換えられる。</li>
+      <li>計測: <strong>ネイティブ float 演算 vs bcmath</strong>（PHPBench・mode 比較）。</li>
+    </ul>
+    <table>
+      <tr><th>対象</th><th>実装</th><th>JIT の恩恵</th></tr>
+      <tr><td>float 演算</td><td>OPCODE</td><td><strong>大きい</strong>（OPCODE が支配的）</td></tr>
+      <tr><td>bcmath</td><td>内部 C 実装</td><td>限定的</td></tr>
+    </table>
+    <blockquote><p>確立する原則: <strong>計算が OPCODE で表現される処理ほど JIT が効く</strong>。</p></blockquote>
+
+    <div class="practice">
+      <h3><span class="star">★ 実践</span> 4-2. 型付き値オブジェクト演算は JIT で大きく改善</h3>
+      <blockquote><p>本トークの<strong>実践的な核</strong>。「ドメイン層 = 型付きの値オブジェクトで計算を表現する層」に JIT が効くことを計測で示す。</p></blockquote>
+
+      <h4>題材: <code>Money</code> 値オブジェクト</h4>
+      <p class="note">型付き（PHP 8.1+ / <code>readonly</code> + 型宣言）</p>
+<pre class="lang" data-lang="php — 型付き"><code>final class Money
+{
+    public function __construct(private readonly int $amount) {}
+
+    public function add(Money $o): self    { return new self($this->amount + $o->amount); }
+    public function multiply(int $f): self { return new self($this->amount * $f); }
+    public function amount(): int          { return $this->amount; }
+}</code></pre>
+      <p class="note">型なし（型宣言を外しただけの等価コード）</p>
+<pre class="lang" data-lang="php — 型なし"><code>final class MoneyLoose
+{
+    private $amount;
+    public function __construct($amount) { $this->amount = $amount; }
+
+    public function add($o)      { return new self($this->amount + $o->amount); }
+    public function multiply($f) { return new self($this->amount * $f); }
+    public function amount()     { return $this->amount; }
+}</code></pre>
+
+      <h4>計測マトリクス（PHPBench / tracing JIT / <code>@Warmup</code> あり）</h4>
+      <table class="matrix">
+        <tr><th>水準</th><th>内容</th><th>JIT ON での読み筋</th></tr>
+        <tr><td><strong>A: 生スカラー演算</strong></td><td><code>$sum = $sum + $a; $sum = $sum * 2;</code></td><td>大きく改善（到達できる上限の目安）</td></tr>
+        <tr><td><strong>B: 型付き Money</strong></td><td><code>add</code> / <code>multiply</code> をループ</td><td><strong>大きく改善し A に肉薄</strong></td></tr>
+        <tr><td><strong>C: 型なし MoneyLoose</strong></td><td>B と同等処理</td><td>改善は鈍い（型ガードが残る）</td></tr>
+      </table>
+
+      <h4>読み筋（このスライドで語ること）</h4>
+      <ul>
+        <li>JIT OFF: B も C も A より明確に遅い（メソッド呼び出し・プロパティアクセス・オブジェクト生成のオーバーヘッド）。B と C の差は小さい。</li>
+        <li>JIT ON:
+          <ul>
+            <li>A は大きく改善（OPCODE がそのままネイティブ命令に）。</li>
+            <li><strong>B（型付き）が大きく改善し A に肉薄</strong> — 型が静的に分かるため、JIT がメソッドをインライン化し、プロパティを直接スロットアクセスし、<code>int</code> 演算として特殊化できる。</li>
+            <li>C（型なし）は改善が鈍い — 型不明ゆえにガード・汎用パスが残る。</li>
+          </ul>
+        </li>
+        <li><strong>結論: B と C の差（＝型を付けたかどうか）が JIT ON で開く。</strong></li>
+      </ul>
+      <blockquote><p>「型を付ける」という設計上の正しさ（型安全）が、そのまま JIT の効きに直結する。</p></blockquote>
+
+      <h4>補足（誠実に / 質疑対策）</h4>
+      <ul>
+        <li>イミュータブルな値オブジェクトは毎演算で <code>new</code> するため、<strong>アロケーション / GC コストは JIT でも消えない</strong>。A に完全一致はしない。「計算部分の差は詰まるが、生成コストは別物」と正直に言う。</li>
+        <li>アロケーションを排した純粋比較として、<strong>型付き vs 型なしプロパティを読んで加算するだけのホットループ</strong>も用意すると、型の効果がさらにクリアに見える。</li>
+        <li>効くのは tracing JIT（<code>opcache.jit=tracing</code>）＋ホットループが前提。単発呼び出しでは出ない。</li>
+      </ul>
+
+      <h4>代入の計測（イミュータブル ＝ コンストラクタ代入）</h4>
+      <p class="note">イミュータブルな値オブジェクトの代入は「コンストラクタでプロパティに 1 回入れる」に集約される。型付き <code>readonly</code> vs 型なしで生成コストを比較。</p>
+<pre class="lang" data-lang="php — 題材"><code>final class TypedPoint
+{
+    public function __construct(
+        private readonly int $x,
+        private readonly int $y,
+    ) {}
+}
+
+final class LoosePoint
+{
+    private $x;
+    private $y;
+    public function __construct($x, $y)
+    {
+        $this->x = $x;
+        $this->y = $y;
+    }
+}</code></pre>
+<pre class="lang" data-lang="php — ベンチ"><code>/** @Revs(1000000) @Iterations(5) @Warmup(2) */
+class ConstructBench
+{
+    public function benchTyped(): void { new TypedPoint(1, 2); }
+    public function benchLoose(): void { new LoosePoint(1, 2); }
+}</code></pre>
+      <ul>
+        <li>JIT ON で <code>benchTyped</code> は <strong>プロパティ代入時の型検証が省かれ</strong>、<code>int</code> は refcount も不要なので素のストアになる。</li>
+        <li><code>benchLoose</code> は汎用代入パスが残る → <strong>差は「型を付けたかどうか」</strong>。コンストラクタ代入というイミュータブルの定石部分に効く。</li>
+        <li>注意: <code>new</code> のアロケーションは両者共通かつ JIT でも消えない。差は代入パスぶんに限られる（誇張しない）。</li>
+      </ul>
+
+      <h4>比較演算子の計測（<code>==</code> vs <code>===</code>）</h4>
+<pre class="lang" data-lang="php — ベンチ"><code>class CompareBench
+{
+    private int $a = 12345;
+    private int $b = 12345;
+    private string $s = '12345';
+
+    /** @Revs(10000000) @Iterations(5) @Warmup(2) */
+    public function benchIdenticalIntInt(): void { $r = $this->a === $this->b; }  // D1
+    public function benchEqualIntInt(): void     { $r = $this->a == $this->b; }   // D2
+    public function benchEqualIntNumStr(): void  { $r = $this->a == $this->s; }   // D3 強制変換
+    public function benchIdenticalIntStr(): void { $r = $this->a === $this->s; }  // D4 型不一致→false
+}</code></pre>
+      <table class="matrix">
+        <tr><th>水準</th><th>比較</th><th>JIT ON での読み筋</th></tr>
+        <tr><td>D1</td><td><code>int === int</code></td><td>1 命令の整数比較に特殊化</td></tr>
+        <tr><td>D2</td><td><code>int == int</code></td><td><strong>D1 と同じ命令に潰れ差が消える</strong></td></tr>
+        <tr><td>D3</td><td><code>int == 数値文字列</code></td><td><strong>突出して遅い・JIT でも縮まらない</strong>（強制変換は C 側）</td></tr>
+        <tr><td>D4</td><td><code>int === string</code></td><td>型不一致で即 false、安い</td></tr>
+      </table>
+      <ul>
+        <li><strong>結論: JIT は型が揃えば <code>==</code> / <code>===</code> の差を消す。差が残るのは coercion のときだけ。</strong>「<code>===</code> が速い」は型が判明していれば無効化される。</li>
+        <li>注意: 値はプロパティ経由で渡す（リテラル直書きだと JIT に定数畳み込みされ、比較自体が消えうる）。</li>
+        <li><code>==</code> の正しさの落とし穴（<code>0 == "a"</code> 等）は <strong>性能とは別軸</strong>。混ぜない。</li>
+      </ul>
+
+      <h4>ドメイン層への接続（山場への伏線）</h4>
+      <ul>
+        <li>ドメイン層を「型付きの値オブジェクト＋計算」で構成すると、JIT の恩恵を最大化できる。</li>
+        <li>逆に、メソッドの中身が標準関数や IO の寄せ集めだと効かない（中身はネイティブ C で JIT の対象外）。</li>
+        <li><strong>「クラスで包んだ計算」に効く</strong>のであって「クラスだから効く」ではない、と釘を刺す。</li>
+      </ul>
+    </div>
+
+    <h3>4-3. ケース②: コールバックを取る標準関数（<code>array_map</code> / <code>usort</code>）</h3>
+    <ul>
+      <li>標準関数でも、<strong>コールバック部分はユーザー定義 = OPCODE が発生する</strong>。</li>
+      <li>「中身のループは C だが、各要素で呼ばれるクロージャは JIT 対象」。</li>
+      <li>計測: コールバックの処理が重いほど JIT の効果が見える、という観点で mode 比較。</li>
+    </ul>
+    <blockquote><p><strong>教訓:</strong> 標準関数でも「ユーザーコードを実行する隙間」があれば JIT は効く。</p></blockquote>
+
+    <h3>4-4. ケース③: 正規表現の「もう一つの JIT」= PCRE JIT</h3>
+    <ul>
+      <li>PHP の JIT とは別系統の、<strong>PCRE ライブラリ自身が持つ JIT</strong>（<code>pcre.jit</code>）の存在を紹介。</li>
+      <li>正規表現エンジンが内部でパターンを機械語化する仕組み。</li>
+      <li>計測: PCRE JIT ON/OFF で比較（PHPBench・mode）。</li>
+    </ul>
+    <blockquote><p><strong>メッセージ:</strong> 「JIT」と一口に言っても複数あり、効くレイヤーが違う。混同しないこと。</p></blockquote>
+
+    <h3>4-5. ケース④: JIT mode 自体で結果が変わる（function vs tracing）</h3>
+    <blockquote><p>同じ「JIT ON」でも mode で差が出る。3-2 の function / tracing の違いを実測で確かめる。題材は <strong>アロケーションを排した純粋比較</strong>（4-2 補足で予告したホットループ）。生成済みインスタンスのプロパティを、ホットループからメソッド経由で読んで加算するだけ。<code>new</code> / GC コストを取り除き、<strong>JIT mode の差</strong>と<strong>型の差</strong>だけを残す。</p></blockquote>
+<pre class="lang" data-lang="php — 題材"><code>final class TypedBox
+{
+    public function __construct(private readonly int $value) {}
+    public function value(): int { return $this->value; }
+}
+
+final class LooseBox            // 型宣言を外しただけ
+{
+    private $value;
+    public function __construct($value) { $this->value = $value; }
+    public function value() { return $this->value; }
+}</code></pre>
+<pre class="lang" data-lang="php — ベンチ"><code>/** @Revs(100) @Iterations(5) @Warmup(2) */
+class HotLoopBench
+{
+    private const N = 10000;
+    private TypedBox $typed;
+    private LooseBox $loose;
+    private int $raw = 7;
+
+    public function setUp(): void { /* インスタンスは 1 回だけ生成 */ }
+
+    public function benchScalar(): void   // A: プロパティ直読み（呼び出しなし）
+    { $s = 0; $v = $this->raw;     for ($i=0;$i&lt;self::N;$i++) $s += $v; }
+    public function benchTyped(): void    // B: TypedBox::value() を毎回呼ぶ
+    { $s = 0; $b = $this->typed;   for ($i=0;$i&lt;self::N;$i++) $s += $b->value(); }
+    public function benchLoose(): void    // C: LooseBox::value()
+    { $s = 0; $b = $this->loose;   for ($i=0;$i&lt;self::N;$i++) $s += $b->value(); }
+}</code></pre>
+
+    <h4>計測結果（実測 / Docker・PHP 8.5 / <code>mode</code>＝平均 1 回あたり）</h4>
+    <p class="note"><code>HotLoopBench</code>（N=10000, <code>@Revs(100)</code>）を 3 構成で実行。</p>
+    <table class="matrix">
+      <tr><th>水準</th><th>JIT OFF</th><th>function (<code>1205</code>)</th><th>tracing (<code>1254</code>)</th><th>OFF→tracing</th></tr>
+      <tr><td>A: 生スカラー</td><td>17.74μs</td><td>4.91μs</td><td><strong>3.77μs</strong></td><td>約 4.7倍</td></tr>
+      <tr><td>B: 型付き TypedBox</td><td>91.64μs</td><td>49.66μs</td><td><strong>38.45μs</strong></td><td>約 2.4倍</td></tr>
+      <tr><td>C: 型なし LooseBox</td><td>92.62μs</td><td>52.09μs</td><td><strong>38.04μs</strong></td><td>約 2.4倍</td></tr>
+    </table>
+    <p class="note">参考: アロケーションを含む <code>MoneyBench</code>（型付き Money / N=1000, <code>@Revs(1000)</code>）は <strong>OFF 231μs → function 175μs → tracing 158μs</strong>。<code>new</code> のコストが残るため改善幅は小さい。</p>
+
+    <h4>読み筋</h4>
+    <ul>
+      <li><strong>JIT OFF → function → tracing で単調に速くなる。</strong> 同じ「JIT ON」でも <strong>function → tracing でさらに 2〜3 割</strong>縮む（例: B 49.7μs → 38.4μs）。「JIT ON にした」だけでは語れない。</li>
+      <li><strong>tracing が function を上回る理由</strong>: ホットループ内の <code>value()</code> を <strong>trace にインライン化</strong>できるから。function は関数単位 compile なので、呼び出し境界が trace のように溶けない。</li>
+      <li><strong>誠実な注意（重要）</strong>: このループでは <strong>型付き B と 型なし C の差はほぼ消える</strong>（tracing で 38.4μs vs 38.0μs）。tracing は <strong>観測した実行時の型で特殊化</strong>するため、<code>int</code> が流れていれば宣言の有無はほとんど効かない。<strong>「型を付ければ JIT で速くなる」を単純化しすぎない</strong>。型宣言が効くのは <code>ConstructBench</code> のような「代入時の型検証」パスで、steady-state の読み出しでは差が出にくい。</li>
+      <li>A（17.7→3.8μs）と B/C（92→38μs）の差は <strong>メソッド呼び出しそのもののコスト</strong>。tracing でも完全には消えない（呼び出しフレームのガード分）。</li>
+    </ul>
+    <blockquote><p><strong>メッセージ:</strong> 「JIT を入れた／入れない」は粗すぎる。<strong>mode（function/tracing）まで含めて測る</strong>。そして mode を変えても、効くのは結局「OPCODE のホットな実行経路」であり、標準関数や生成コストは別。</p></blockquote>
+  </section>
+
+  <section class="part" id="s5">
+    <h2>5. まとめ — レイヤーで考える高速化戦略</h2>
+
+    <h3>5-1. 役割分担の整理</h3>
+    <table>
+      <tr><th>仕組み</th><th>効く対象</th><th>典型的な場所</th></tr>
+      <tr><td>OPcache</td><td>コード量が多い処理（コンパイルコスト）</td><td>外部依存・フレームワーク層</td></tr>
+      <tr><td>JIT</td><td>OPCODE 計算が支配的な処理</td><td>コアドメイン・数値計算層</td></tr>
+    </table>
+
+    <h3>5-2. アーキテクチャとの相乗効果（このトークの主張）</h3>
+    <ul>
+      <li>フレームワークを使いつつ、<strong>ユーザー手続きコード（ドメインロジック）が厚くなる</strong>設計では、両方の恩恵を受けられる。</li>
+      <li><strong>クリーンアーキテクチャ的な層構造</strong>と相性が良い:
+        <ul>
+          <li><strong>外部依存の層（フレームワーク・I/O）</strong> → <em>OPcache</em> が効く。</li>
+          <li><strong>コアドメインの層（純粋なロジック・計算）</strong> → <em>JIT</em> が効く。</li>
+        </ul>
+      </li>
+      <li>つまり「関心の分離」をすると、高速化の効きどころも自然と分離される。</li>
+    </ul>
+
+    <h3>5-3. 持ち帰ってほしいこと</h3>
+    <ol class="takeaways">
+      <li>JIT は「OPCODE の実行」を速くするだけ。標準関数の中身は速くならない。</li>
+      <li>JIT が効くのは数値計算・コールバック・ドメインロジック。</li>
+      <li>OPcache はコード量に比例して効く（フレームワーク向き）。</li>
+      <li>「JIT」には PCRE JIT など別系統もある。</li>
+      <li>レイヤー設計とキャッシュ/JIT の効きどころは対応している。</li>
+    </ol>
+  </section>
+
+  <section class="part" id="appendix">
+    <h2>付録 <span class="tag">時間があれば / 質疑用</span></h2>
+    <ul>
+      <li>各 JIT mode（<code>tracing</code> vs <code>function</code>）の違いと使い分け。</li>
+      <li><code>opcache.jit_buffer_size</code> などの実運用設定の勘所。</li>
+      <li>計測の落とし穴（ウォームアップ、<code>@Revs</code> 設定、CLI vs FPM での挙動差）。</li>
+      <li>ベンチコードの公開先 / 再現方法。</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>
