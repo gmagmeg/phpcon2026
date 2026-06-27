@@ -66,6 +66,10 @@ npm start     # gulp serve で dist/ をビルドして配信（http://localhost
 
 強調したいときは太字ではなく `.key`（色）や `.emph-*`（サイズ）を使ってください。
 
+> メリットは青（`--accent`）、デメリットは赤（`--base-red`）で表す。
+
+良い/効く側は `.ok`（青）、悪い/効かない側は `.ng`（赤）を使ってください（`.checklist` / `.legend` 共通）。
+
 ## PDF 化
 
 `?print-pdf` を付けて開くと PDF 用の上書き（`style.css` 末尾）が効きます。box-shadow 除去・スライド番号の黒字化・タイトルスライドの位置固定を含みます。

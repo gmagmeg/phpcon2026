@@ -45,7 +45,7 @@
     text-align: left;
 }
 .reveal section {
-    max-width: min(1320px, 92vw);
+    max-width: 100%;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -53,6 +53,16 @@
 }
 .reveal section > * + * {
     margin-top: 18px;
+}
+/* 本文を上下中央に：表示中スライドをスライド全高にして縦方向中央寄せ。
+   reveal が present に付与する inline display:block を !important で上書きする。
+   横位置は各スライドの既存指定（左寄せ等）を維持する。 */
+.reveal .slides > section.present {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100%;
+    box-sizing: border-box; /* 縦パディングを全高に含め、はみ出しによる中央ズレを防ぐ */
 }
 
 /* ---------------------------------------------------------------------
@@ -373,7 +383,7 @@ ol.emph-middle-list li {
 .reveal table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
+    margin: 10px 0 0;
     font-size: clamp(18px, 2vw, 26px);
 }
 .reveal thead th {
@@ -390,7 +400,7 @@ ol.emph-middle-list li {
     vertical-align: top;
 }
 .reveal tbody tr:nth-child(even) {
-    background: #f8fafc;
+    background: #e9eef5;
 }
 .reveal td code {
     background: #f1f5f9;
@@ -411,6 +421,11 @@ ol.emph-middle-list li {
 /* 比較テーブルで注目行をハイライト */
 .reveal .compare-table tbody tr.highlight {
     background: rgba(19, 74, 169, 0.1);
+}
+/* 悪化した計測値（OPcache ON で遅くなった等）を赤で示す */
+.reveal .compare-table .worse {
+    color: var(--base-red);
+    font-weight: 700;
 }
 .reveal .compare-table tbody tr.highlight td {
     color: var(--accent);
@@ -448,16 +463,43 @@ ol.emph-middle-list li {
 /* 章区切りスライド: 帯つきの大見出しを中央に */
 .reveal section.section-divider {
     text-align: center;
-    padding: 22vh 2.5ch 0;
+    padding: 0 2.5ch;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 .reveal section.section-divider h1 {
     display: inline-block;
-    background: var(--accent);
-    color: #fff;
+    color: #000;
     padding: 0.25em 0.6em;
-    border-radius: 10px;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    font-size: clamp(64px, 8vw, 96px);
     letter-spacing: 0.01em;
+}
+
+/* サブ区切りスライド: 見出しをスライドの縦横中央に */
+.reveal section.subsection-divider {
+    min-height: 100%;
+    padding: 0 2.5ch;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+.reveal section.subsection-divider h2 {
+    color: #000;
+    font-size: clamp(52px, 7vw, 88px);
+    letter-spacing: 0.01em;
+}
+
+/* 概要図 SVG: スライド内に収める */
+.reveal .concept-svg {
+    display: block;
+    width: 100%;
+    max-width: 960px;
+    max-height: 56vh;
+    margin: 0.4em auto 0;
 }
 
 /* 章つなぎスライド: 本文を一回り大きく */
@@ -498,11 +540,12 @@ ol.emph-middle-list li {
     font-weight: 900;
     margin-right: 0.25em;
 }
-.reveal .checklist .ok .mark {
-    color: #15803d; /* green */
+/* メリット = 青、デメリット = 赤（マーク・本文ともに色付け） */
+.reveal .checklist .ok {
+    color: var(--accent); /* blue: メリット */
 }
-.reveal .checklist .ng .mark {
-    color: var(--base-red); /* red */
+.reveal .checklist .ng {
+    color: var(--base-red); /* red: デメリット */
 }
 .reveal .checklist p {
     margin: 0;
@@ -512,7 +555,7 @@ ol.emph-middle-list li {
 }
 .reveal .legend .ok,
 .reveal .legend-ok {
-    color: #15803d;
+    color: var(--accent); /* blue: メリット */
     font-weight: 700;
 }
 .reveal .legend .ng,
