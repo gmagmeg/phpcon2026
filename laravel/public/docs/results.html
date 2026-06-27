@@ -56,14 +56,14 @@
 <table>
   <thead><tr><th>処理</th><th>OPcache/JIT ON (mode)</th><th>rstdev</th><th>OPcache/JIT OFF</th><th>相対（ON基準）</th></tr></thead>
   <tbody>
-    <tr><td>in_array (O(n))</td><td>14.775μs</td><td>±0.51%</td><td>14.763μs</td><td>基準</td></tr>
-    <tr><td>isset (O(1))</td><td>0.016μs</td><td>±11.00%</td><td>0.028μs</td><td><strong>約920倍速</strong></td></tr>
-    <tr><td>array_key_exists (O(1))</td><td>0.030μs</td><td>±8.21%</td><td>0.036μs</td><td><strong>約490倍速</strong></td></tr>
+    <tr><td>in_array (O(n))</td><td>11.753μs</td><td>±0.61%</td><td>11.877μs</td><td>基準</td></tr>
+    <tr><td>isset (O(1))</td><td>0.079μs</td><td>±4.18%</td><td>0.022μs</td><td><strong>約150倍速</strong></td></tr>
+    <tr><td>array_key_exists (O(1))</td><td>0.108μs</td><td>±5.69%</td><td>0.031μs</td><td><strong>約110倍速</strong></td></tr>
   </tbody>
 </table>
-<p class="note">→ 10,000要素の末尾を探索。<code>in_array</code> は線形 O(n)、<code>isset</code>/<code>array_key_exists</code> はハッシュ参照 O(1)。<strong>OPcache/JIT の ON・OFF で in_array はほぼ不変</strong>（14.8μs↔14.8μs）。いずれも内部関数のため、差は完全に<strong>計算量由来</strong>で OPcache・JIT は無関係。 計測環境: PHP 8.5.7 / xdebug ❌（ON時 opcache ✔ / OFF時 opcache ❌）。 <code>benchmarks/InArrayBench.php</code></p>
-<p class="note">isset / array_key_exists は1回が ~10〜30ns と極小のため rstdev が大きい（±8〜11%）。絶対値の僅差より、<strong>桁（約920倍 / 約490倍）</strong>で読むのが正しい。 ON: 既定設定 / OFF: <code>--php-config='opcache.enable_cli: 0'</code></p>
-<p class="note">総実行時間（<code>revs × its = 2000 × 5 = 10,000回</code>分、<code>sum(result_time_net)</code>）— <strong>ON / OFF</strong>: in_array <strong>147.0ms / 157.4ms</strong> ・ isset <strong>0.16ms / 0.28ms</strong> ・ array_key_exists <strong>0.31ms / 0.37ms</strong>。in_array は ON/OFF ほぼ同等（内部関数）。</p>
+<p class="note">→ 10,000要素の末尾を探索。<code>in_array</code> は線形 O(n)、<code>isset</code>/<code>array_key_exists</code> はハッシュ参照 O(1)。<strong>OPcache/JIT の ON・OFF で in_array はほぼ不変</strong>（11.8μs↔11.9μs・約1%差で誤差内）。いずれも内部関数／専用 opcode のため、差は完全に<strong>計算量由来</strong>で OPcache・JIT は無関係。 計測環境: PHP 8.5.7 / xdebug ❌（ON時 opcache ✔ / OFF時 opcache ❌）。再計測 2026-06-22。 <code>benchmarks/InArrayBench.php</code></p>
+<p class="note">isset / array_key_exists は1回が ~20〜100ns と極小のため rstdev が大きく（±4〜6%）、mode 推定もブレる（ON/OFF の前後が逆転しうる）。絶対値の僅差より、<strong>桁（in_array 比 約150倍 / 約110倍）</strong>で読むのが正しい。 ON: 既定設定 / OFF: <code>--php-config='opcache.enable_cli: 0'</code></p>
+<p class="note">総実行時間の目安（<code>revs × its = 2000 × 5 = 10,000回</code>分・mode×回数の概算）— <strong>ON / OFF</strong>: in_array <strong>約117.5ms / 約118.8ms</strong> ・ isset <strong>約0.79ms / 約0.22ms</strong> ・ array_key_exists <strong>約1.08ms / 約0.31ms</strong>。in_array は ON/OFF ほぼ同等（内部関数）。</p>
 </div>
 
 <div class="card">
@@ -102,6 +102,37 @@
   </tbody>
 </table>
 <p class="note">→ <code>preg_*</code> は C(PCRE)実装なので <strong>opcache の JIT は無関係</strong>（右列：opcache JIT を切っても 509μs↔511μs で不変）。一方 PCRE は<strong>独自の JIT</strong>を持ち、<code>pcre.jit=0</code> にすると <strong>preg_match 約8.7倍 / preg_match_all 約6.6倍</strong>遅くなる。「PHPのJIT(opcache)」と「正規表現のJIT(PCRE)」は<strong>別物</strong>。標準関数で劇的な JIT 効果を出せる唯一格の題材。 <code>benchmarks/PcreJitBench.php</code> ／ 解説は <a href="jit.html">JITのしくみ</a></p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">⑤ 値オブジェクト演算（MoneyBench）— new あり・3 mode 比較</h3>
+<table>
+  <thead><tr><th>水準</th><th>JIT OFF</th><th>function (1205)</th><th>tracing (1254)</th><th>OFF→tracing</th></tr></thead>
+  <tbody>
+    <tr><td><strong>A: 生スカラー演算</strong>（<code>($i+$i)*2</code> をループ）</td><td>4.380μs</td><td>0.797μs</td><td><strong>0.697μs</strong></td><td><strong>約6.3倍速</strong></td></tr>
+    <tr><td>B: 型付き Money（<code>add</code>/<code>multiply</code> をループ）</td><td>186.756μs</td><td>148.075μs</td><td>129.513μs</td><td>約1.44倍速</td></tr>
+    <tr><td>C: 型なし MoneyLoose（B と同等処理）</td><td>159.023μs</td><td>120.581μs</td><td>100.255μs</td><td>約1.59倍速</td></tr>
+  </tbody>
+</table>
+<p class="note">→ N=1000・<code>@Revs(1000)</code> / 毎演算で <code>new Money(...)</code>。<strong>A はスカラー演算なので OPCODE が支配的で JIT が大きく効く（約6.3倍）</strong>。一方 B/C は <strong>毎回の <code>new</code> によるアロケーション / GC コストが支配的</strong>で、JIT 効果は 1.4〜1.6 倍にとどまる。注目すべきは <strong>B（型付き）が C（型なし）より遅い</strong>こと — <code>readonly</code> プロパティの代入時チェックが残るため。「型を付ければ JIT で速くなる」を単純化しすぎてはいけないことを示す題材。 <code>benchmarks/MoneyBench.php</code> ／ 計測日 2026-06-27 / PHP 8.5.7・PHPBench 1.7 mode</p>
+<p class="note">再現: <code>docker compose exec app vendor/bin/phpbench run benchmarks/MoneyBench.php --report=aggregate</code>（tracing）／ function 版は <code>--php-config='opcache.jit: function'</code> ／ OFF 版は <code>--php-config='opcache.jit_buffer_size: 0'</code>。</p>
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">⑥ アロケーションを排した純粋比較（HotLoopBench）— 型付き / 型なし × 3 mode</h3>
+<table>
+  <thead><tr><th>水準</th><th>JIT OFF</th><th>function (1205)</th><th>tracing (1254)</th><th>OFF→tracing</th></tr></thead>
+  <tbody>
+    <tr><td><strong>A: 生スカラー</strong>（プロパティ直読み・呼び出しなし）</td><td>28.617μs</td><td>7.755μs</td><td><strong>6.468μs</strong></td><td><strong>約4.4倍速</strong></td></tr>
+    <tr><td>B: 型付き TypedBox（<code>value()</code> をホットループ）</td><td>149.190μs</td><td>83.457μs</td><td>55.103μs</td><td>約2.7倍速</td></tr>
+    <tr><td>C: 型なし LooseBox（B と同等処理）</td><td>149.936μs</td><td>85.713μs</td><td>55.187μs</td><td>約2.7倍速</td></tr>
+  </tbody>
+</table>
+<p class="note">→ N=10000・<code>@Revs(100)</code> / インスタンスは <code>setUp</code> で 1 回だけ生成（毎反復のアロケーションを排除）。読み筋は 2 つ:<br>
+(1) <strong>同じ JIT ON でも function → tracing でさらに 2〜3 割速くなる</strong>（B: 83.5μs → 55.1μs）。tracing は <strong>関数境界を越えてホットな <code>value()</code> をインライン化</strong>できるため。<br>
+(2) <strong>型付き B と 型なし C の差はほぼ消える</strong>（tracing で 55.1μs vs 55.2μs）。tracing は <strong>観測した実行時型で特殊化</strong>するので、<code>int</code> が流れていれば宣言の有無は steady-state では効きにくい。「型を付ければ JIT で速い」の単純化への正直な反例。<br>
+A と B/C の差（6.5μs vs 55μs）はメソッド呼び出しフレームのコスト分。 <code>benchmarks/HotLoopBench.php</code> ／ 計測日 2026-06-27 / PHP 8.5.7・PHPBench 1.7 mode</p>
+<p class="note">再現: <code>docker compose exec app vendor/bin/phpbench run benchmarks/HotLoopBench.php --report=aggregate</code>（tracing）／ function: <code>--php-config='opcache.jit: function'</code> ／ OFF: <code>--php-config='opcache.jit_buffer_size: 0'</code>。</p>
 </div>
 
 <div class="pager">
