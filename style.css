@@ -564,6 +564,52 @@ ol.emph-middle-list li {
     font-weight: 700;
 }
 
+.reveal .scenario-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.reveal .scenario-steps li {
+    margin: 0;
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 16px;
+    align-items: start;
+    padding: 16px 20px;
+    border: 2px solid #d8e3f6;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #f8fbff 0%, #eef4fc 100%);
+}
+
+.reveal .scenario-steps .step-no {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #ffffff;
+    font-size: 0.95em;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.reveal .scenario-steps strong {
+    color: var(--heading-navy);
+    font-size: 1.05em;
+    font-weight: 800;
+    margin-right: 0.35em;
+}
+
+.reveal .scenario-steps p {
+    margin: 0;
+    font-size: 0.92em;
+}
+
 /* ---------------------------------------------------------------------
  * 11. アイコン（インライン SVG 用サイズ）
  * ------------------------------------------------------------------- */

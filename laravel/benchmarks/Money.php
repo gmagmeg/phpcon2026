@@ -16,14 +16,34 @@ final class Money
 {
     public function __construct(private readonly int $amount) {}
 
+    public static function zero(): self
+    {
+        return new self(0);
+    }
+
     public function add(Money $o): self
     {
         return new self($this->amount + $o->amount);
     }
 
+    public function subtract(Money $o): self
+    {
+        return new self($this->amount - $o->amount);
+    }
+
     public function multiply(int $f): self
     {
         return new self($this->amount * $f);
+    }
+
+    public function isPositive(): bool
+    {
+        return $this->amount > 0;
+    }
+
+    public function greaterThanOrEqual(Money $other): bool
+    {
+        return $this->amount >= $other->amount;
     }
 
     public function amount(): int

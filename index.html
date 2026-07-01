@@ -455,28 +455,29 @@ foreach ($strings as $s) {
 		</section>
 
 		<section>
-			<h2>なぜ「型のあるコード」に JIT が効くのか</h2>
+			<h2>JIT の 2 つの mode：function と tracing</h2>
 			<ul class="emph-middle-list">
-				<li>tracing JIT は <span class="key">実行時に型を観測</span>して機械語を生成する</li>
-				<li>型が静的に分かる（<code>readonly int</code>、引数・戻り値の型宣言）ほど…
-					<ul>
-						<li>型チェック・ガードを<span class="key">省略</span>できる</li>
-						<li><code>int + int</code> を <span class="key">1 命令の整数加算</span>に特殊化できる</li>
-						<li>プロパティを <span class="key">直接スロットアクセス</span>（zval ハッシュ参照を省く）</li>
-						<li>小さなメソッドを <span class="key">インライン展開</span>できる</li>
-					</ul>
-				</li>
-				<li>逆に型が緩い（型なしプロパティ・<code>mixed</code>）と<span class="key">汎用パス＋ガード</span>が残り、効果が鈍る</li>
+				<li><span class="key">function</span>：<span class="key">関数まるごと</span>を機械語化する</li>
+				<li><span class="key">tracing（既定）</span>：実行を観測し、<span class="key">ホットな経路だけ</span>を機械語化する</li>
 			</ul>
-			<p class="muted">※ <code>declare(strict_types=1)</code> は関数境界の型変換挙動の話で、JIT の特殊化を直接効かせるのは<span class="key">プロパティ・引数・戻り値の型宣言</span>。</p>
+			<p style="margin-top:.4em;text-align:center"><span class="key emph-1_2x">同じ「JIT ON」でも mode で結果が変わる</span></p>
 		</section>
 
 		<section>
-			<h2>3-4. 題材：<code>Money</code> 値オブジェクト</h2>
-			<div class="columns">
-				<div class="col">
-					<p class="small">型付き（<code>readonly</code> + 型宣言）</p>
-					<pre style="font-size:.46em"><code data-trim data-noescape class="language-php">
+			<h2>型があるほど JIT が最適化しやすい</h2>
+			<p>引数・戻り値の型宣言などで型が安定しているほど、JIT は次の最適化をしやすい</p>
+			<ul class="emph-middle-list">
+						<li>型チェック・ガードを<span class="key">省略しやすい</span></li>
+						<li><code>int + int</code> を <span class="key">整数加算</span>として特殊化しやすい</li>
+						<li>プロパティアクセスを <span class="key">より直接的な経路</span>へ最適化しやすい</li>
+						<li>小さなメソッドを <span class="key">インライン展開</span>しやすい</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2><code>Money</code> オブジェクト</h2>
+			<p><code>readonly</code> + 型宣言<br>引数・戻り値・プロパティすべてに型がある。</p>
+			<pre style="font-size:.52em"><code data-trim data-noescape class="language-php">
 final class Money
 {
     public function __construct(
@@ -489,53 +490,169 @@ final class Money
     public function multiply(int $f): self
     { return new self($this->amount * $f); }
 }
-					</code></pre>
-				</div>
-				<div class="col">
-					<p class="small">型なし（型宣言を外しただけ）</p>
-					<pre style="font-size:.46em"><code data-trim data-noescape class="language-php">
-final class MoneyLoose
-{
-    private $amount;
-    public function __construct($amount)
-    { $this->amount = $amount; }
-
-    public function add($o)
-    { return new self($this->amount + $o->amount); }
-
-    public function multiply($f)
-    { return new self($this->amount * $f); }
-}
-					</code></pre>
-				</div>
-			</div>
+			</code></pre>
+			
 		</section>
 
 		<section>
-			<h2>計測結果：Money 値オブジェクト（3 mode）</h2>
-			<table class="compare-table">
-				<thead><tr><th>水準</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
-				<tbody>
-					<tr class="highlight"><td>A: Scalar</td><td>4.4μs</td><td>0.8μs</td><td><span class="key">0.7μs</span></td><td><span class="key">約 6.3 倍速</span></td></tr>
-					<tr><td>B: TypedMoney</td><td>186.8μs</td><td>148.1μs</td><td>129.5μs</td><td>約 1.4 倍速</td></tr>
-					<tr><td>C: LooseMoney</td><td>159.0μs</td><td>120.6μs</td><td>100.3μs</td><td>約 1.6 倍速</td></tr>
-				</tbody>
-			</table>
-			<p class="muted">N=1000・@Revs(1000) / PHP 8.5・PHPBench mode。<span class="key">毎演算で <code>new</code></span> するため、ここではアロケーションコストが支配的で型差は出ない（B > C）。</p>
-		</section>
-
-		<section>
-			<h2>計測結果：アロケーション排除（HotLoopBench）</h2>
-			<p class="small">プロパティを毎反復読んで加算するだけ。<code>new</code> なし、ホットループ 10,000 回</p>
+			<p class="small">計測内容：プロパティを毎反復読んで加算する</p>
 			<table class="compare-table">
 				<thead><tr><th>水準</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
 				<tbody>
 					<tr class="highlight"><td>A: Scalar</td><td>28.6μs</td><td>7.8μs</td><td><span class="key">6.5μs</span></td><td><span class="key">約 4.4 倍速</span></td></tr>
-					<tr><td>B: Typed</td><td>149.2μs</td><td>83.5μs</td><td>55.1μs</td><td>約 2.7 倍速</td></tr>
-					<tr><td>C: Loose</td><td>149.9μs</td><td>85.7μs</td><td>55.2μs</td><td>約 2.7 倍速</td></tr>
+					<tr><td>B: 型付き</td><td>149.2μs</td><td>83.5μs</td><td>55.1μs</td><td>約 2.7 倍速</td></tr>
 				</tbody>
 			</table>
-			<p class="muted">tracing は <span class="key">関数境界を越えてインライン化</span>するため function より 2〜3 割速い。一方で <span class="key">B と C の差はほぼ消える</span>（55.1 vs 55.2μs）― tracing は観測した実型で特殊化するので、宣言の有無は steady-state では効きにくい。</p>
+		</section>
+
+		<section>
+			<h2>振替要求フロー</h2>
+			<p class="small">より実践的なシナリオで計測</p>
+			<ul class="scenario-steps">
+				<li>
+					<span class="step-no">1</span>
+					<p><strong>入力</strong> 5,000 件の振替要求</p>
+				</li>
+				<li>
+					<span class="step-no">2</span>
+					<p><strong>判定</strong> 重複要求を除外し、手数料を計算する</p>
+				</li>
+				<li>
+					<span class="step-no">3</span>
+					<p><strong>更新</strong> 送金元 / 手数料口座 / 送金先の 3 口座を更新する</p>
+				</li>
+				<li>
+					<span class="step-no">4</span>
+					<p><strong>記録</strong> 出金 / 手数料 / 入金イベントを履歴に積む</p>
+				</li>
+				<li>
+					<span class="step-no">5</span>
+					<p><strong>投影</strong> 最後にステートメント投影を更新する</p>
+				</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>連想配列での振替要求コード</h2>
+			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
+foreach ($rows as $row) {
+    // 冪等性キーで重複要求を除外する
+    if (isset($processed[$row['idempotency_key']])) {
+        continue;
+    }
+
+    // 入力金額から手数料を計算する
+    $fee = max(10, intdiv($row['amount'], 20));
+
+    // 送金元口座から出金イベントを反映する
+    $accounts['merchant']['balance'] -= $row['amount'];
+    $accounts['merchant']['history'][] = ['operation' => 'withdraw', ...];
+
+    // 〜手数料徴収と手数料口座への反映〜ステートメント投影の更新まで
+
+    // 処理済みキーを記録する
+    $processed[$row['idempotency_key']] = true;
+}
+			</code></pre>
+		</section>
+
+		<section>
+			<h2>実践例：振替要求フロー（型付き VO 版）</h2>
+			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
+final readonly class TransferRequest
+{
+    public function __construct(
+        public AccountId $payerId,
+        public AccountId $payeeId,
+        public Money $amount,
+        public IdempotencyKey $idempotencyKey,
+    ) {}
+}
+
+$receipt = $service->process($request, $registry, $processed);
+$statements->applyReceipt($receipt);
+// process():
+// 1. duplicate check
+// 2. feeFor($request)
+// 3. payer->withdraw / payer->chargeFee / feeVault->deposit / payee->deposit
+			</code></pre>
+		</section>
+
+		<section>
+			<h2>計測結果</h2>
+			<table class="compare-table">
+				<thead><tr><th>実装</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
+				<tbody>
+					<tr><td>配列</td><td>9.457ms</td><td>7.985ms</td><td>6.657ms</td><td><span class="key">約 1.42 倍速</span></td></tr>
+					<tr class="highlight"><td>VO</td><td>17.935ms</td><td>15.614ms</td><td>3.847ms</td><td><span class="key">約 4.66 倍速</span></td></tr>
+				</tbody>
+			</table>
+			<p class="small">配列 = 連想配列版 / VO = 型付き VO 版</p>
+			<p>JIT なし：手続きが高速<br>JIT あり：型付き VO が高速</p>
+		</section>
+
+		<section>
+			<h2>単一実装 vs ポリモーフィズム</h2>
+			<p class="small">同じ計算処理を、interface有り無しで比較する</p>
+			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
+interface TransferRiskScorer {
+    public function score(TransferRequest $request, int $iteration): int;
+}
+
+$score += $concrete->score($request, $i);      // 直接 concrete
+$score += $mono->score($request, $i);          // 単一 interface
+$score += $polys[$i % 3]->score($request, $i); // 多態 dispatch	
+			</code></pre>
+			<ul class="emph-middle-list small">
+				<li><code>concrete</code> = 直呼び</li>
+				<li><code>mono</code> = interface 1 種</li>
+				<li><code>polys</code> = interface 3 種切替</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>計測結果</h2>
+			<table class="compare-table small">
+				<thead><tr><th>呼び方</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+				<tbody>
+					<tr><td>concrete 直呼び</td><td>4.069ms</td><td>2.732ms</td><td>1.836ms</td></tr>
+					<tr><td>単一 interface</td><td>3.930ms</td><td>2.648ms</td><td>1.790ms</td></tr>
+					<tr class="highlight"><td>複数実装 interface</td><td>4.160ms</td><td>2.703ms</td><td>1.988ms</td></tr>
+				</tbody>
+			</table>
+			<p>わりと横並びの結果に。<br>JIT 導入時はポリモーフィズムの有無で、そこまで気にしなくて良さそう</p>
+		</section>
+
+		<section>
+			<h2>immutable vs mutable 集約</h2>
+			<p class="small">同じ集計を、オブジェクト生成の有無だけ変えて比較する</p>
+			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
+$total = Money::zero();
+foreach ($requests as $request) {
+    $net = $request->amount->subtract($feePolicy->feeFor($request));
+    $total = $total->add($net); // 毎回 new
+}
+
+$mutable->addAmount(...);
+$mutable->subtractAmount(...);
+			</code></pre>
+			<ul class="emph-middle-list small">
+				<li><code>immutable</code> = 加算ごとに new</li>
+				<li><code>mutable</code> = 同じ入れ物を更新</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>計測結果：immutable vs mutable 集約</h2>
+			<table class="compare-table small">
+				<thead><tr><th>集約方法</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+				<tbody>
+					<tr><td>scalar int</td><td>716.909μs</td><td>357.213μs</td><td>318.588μs</td></tr>
+					<tr class="highlight"><td>immutable Money</td><td>1.740ms</td><td>1.296ms</td><td>1.087ms</td></tr>
+					<tr><td>mutable Money</td><td>806.348μs</td><td>562.732μs</td><td>321.264μs</td></tr>
+				</tbody>
+			</table>
+			<p class="muted"><span class="key">JIT が効いてもアロケーションは消えない</span>。immutable は改善するが、mutable 集約や scalar に比べると new のぶん重さが残る。</p>
 		</section>
 
 		<section>
@@ -599,52 +716,6 @@ $this->a === $this->s;  // D4: int === string（型不一致 → false）
 				<li>逆に、メソッドの中身が標準関数や IO の寄せ集めだと効かない（中身は C で JIT 対象外）</li>
 			</ul>
 			<p style="text-align:center"><span class="key emph-1_2x">「クラスで包んだ計算」に効く</span><br>のであって「クラスだから効く」ではない</p>
-		</section>
-
-		<!-- 4-5 mode -->
-		<section>
-			<h2>3-5. ケース④：mode 自体で結果が変わる</h2>
-			<p>同じ「JIT ON」でも mode で差が出る。<span class="key">アロケーションを排した純粋比較</span>：生成済みインスタンスのプロパティをホットループから読んで加算するだけ。</p>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
-final class TypedBox {
-    public function __construct(private readonly int $value) {}
-    public function value(): int { return $this->value; }
-}
-// HotLoopBench:  N=10000 をループして value() を毎回呼ぶ
-public function benchTyped(): void
-{ $s = 0; $b = $this->typed; for ($i=0;$i&lt;self::N;$i++) $s += $b-&gt;value(); }
-			</code></pre>
-		</section>
-
-		<section>
-			<h2>3-5. 計測結果（mode＝平均 1 回あたり）</h2>
-			<table class="compare-table">
-				<thead><tr><th>水準</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
-				<tbody>
-					<tr><td>A: 生スカラー</td><td>17.74μs</td><td>4.91μs</td><td>3.77μs</td><td>約 4.7倍</td></tr>
-					<tr class="highlight"><td>B: 型付き TypedBox</td><td>91.64μs</td><td>49.66μs</td><td>38.45μs</td><td>約 2.4倍</td></tr>
-					<tr><td>C: 型なし LooseBox</td><td>92.62μs</td><td>52.09μs</td><td>38.04μs</td><td>約 2.4倍</td></tr>
-				</tbody>
-			</table>
-			<ul class="small">
-				<li><span class="key">OFF → function → tracing で単調に速くなる</span>。同じ「JIT ON」でも function→tracing でさらに 2〜3 割縮む</li>
-				<li>tracing が速い理由：ホットループ内の <code>value()</code> を <span class="key">trace にインライン化</span>できるから</li>
-			</ul>
-		</section>
-
-		<section>
-			<h2>3-5. 誠実な注意（重要）</h2>
-			<ul class="emph-middle-list">
-				<li>このループでは <span class="key">型付き B と型なし C の差はほぼ消える</span>（tracing で 38.4 vs 38.0μs）</li>
-				<li>tracing は<span class="key">観測した実行時の型で特殊化</span>するため、<code>int</code> が流れていれば宣言の有無は効きにくい</li>
-				<li>型宣言が効くのは <code>ConstructBench</code> のような「代入時の型検証」パス。steady-state の読み出しでは差が出にくい</li>
-			</ul>
-			<p class="muted small">「型を付ければ JIT で速くなる」を単純化しすぎない。</p>
-		</section>
-
-		<section class="center-punch">
-			<p>「JIT を入れた / 入れない」は粗すぎる。</p>
-			<p class="answer">mode（function / tracing）まで含めて測る。</p>
 		</section>
 
 		<!-- ============================================================ -->
