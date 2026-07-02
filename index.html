@@ -624,8 +624,8 @@ $score += $polys[$i % 3]->score($request, $i); // 多態 dispatch
 		</section>
 
 		<section>
-			<h2>immutable vs mutable 集約</h2>
-			<p class="small">同じ集計を、オブジェクト生成の有無だけ変えて比較する</p>
+			<h2>イミュータブル vs ミュータブル</h2>
+			<p class="small">同じ集計処理をオブジェクト生成の有無だけ変えて比較する</p>
 			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
 $total = Money::zero();
 foreach ($requests as $request) {
@@ -637,22 +637,39 @@ $mutable->addAmount(...);
 $mutable->subtractAmount(...);
 			</code></pre>
 			<ul class="emph-middle-list small">
-				<li><code>immutable</code> = 加算ごとに new</li>
-				<li><code>mutable</code> = 同じ入れ物を更新</li>
+				<li>イミュータブル = 加算ごとに new</li>
+				<li>ミュータブル = 同じ入れ物を更新</li>
 			</ul>
 		</section>
 
 		<section>
-			<h2>計測結果：immutable vs mutable 集約</h2>
+			<h2>計測結果</h2>
 			<table class="compare-table small">
-				<thead><tr><th>集約方法</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+				<thead><tr><th></th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
 				<tbody>
 					<tr><td>scalar int</td><td>716.909μs</td><td>357.213μs</td><td>318.588μs</td></tr>
-					<tr class="highlight"><td>immutable Money</td><td>1.740ms</td><td>1.296ms</td><td>1.087ms</td></tr>
-					<tr><td>mutable Money</td><td>806.348μs</td><td>562.732μs</td><td>321.264μs</td></tr>
+					<tr class="highlight"><td>イミュータブル</td><td>1.740<strong>ms</strong></td><td>1.296<strong>ms</strong></td><td>1.087<strong>ms</strong></td></tr>
+					<tr><td>ミュータブル</td><td>806.348μs</td><td>562.732μs</td><td>321.264μs</td></tr>
 				</tbody>
 			</table>
-			<p class="muted"><span class="key">JIT が効いてもアロケーションは消えない</span>。immutable は改善するが、mutable 集約や scalar に比べると new のぶん重さが残る。</p>
+			
+		</section>
+		<section>
+			<h2>JIT を効かせても生成コストは残る</h2>
+			<div style="display:flex;align-items:center;justify-content:center;gap:.7em;margin:.6em 0;">
+				<div style="text-align:center;">
+					<div>イミュータブル<br>JIT tracing</div>
+					<div style="font-size:3em;font-weight:800;color:#b91c1c;line-height:1.1;">1,087<span style="font-size:.4em;">ms</span></div>
+				</div>
+				<div style="font-size:3em;font-weight:800;color:#5b6b80;">&gt;</div>
+				<div style="text-align:center;">
+					<div>ミュータブル<br>JIT なし</div>
+					<div style="font-size:3em;font-weight:800;color:#15803d;line-height:1.1;">806<span style="font-size:.4em;">μs</span></div>
+				</div>
+			</div>
+		</section>
+		<section>
+todo：継承パターンの計測結果を追加する
 		</section>
 
 		<section>

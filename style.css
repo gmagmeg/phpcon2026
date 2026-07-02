@@ -569,19 +569,42 @@ ol.emph-middle-list li {
     margin: 0;
     padding: 0;
     display: grid;
-    gap: 12px;
+    gap: 34px;
 }
 
 .reveal .scenario-steps li {
+    position: relative;
     margin: 0;
     display: grid;
     grid-template-columns: 56px 1fr;
     gap: 16px;
     align-items: start;
-    padding: 16px 20px;
-    border: 2px solid #d8e3f6;
-    border-radius: 18px;
-    background: linear-gradient(180deg, #f8fbff 0%, #eef4fc 100%);
+    padding: 0;
+}
+
+/* 数字どうしを繋ぐ縦線 */
+.reveal .scenario-steps li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 27px;
+    top: 56px;
+    bottom: -34px;
+    width: 2px;
+    background: var(--accent);
+}
+
+/* 下向きの矢じり（次の数字を指す） */
+.reveal .scenario-steps li:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 21px;
+    bottom: -34px;
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 9px solid var(--accent);
+    z-index: 1;
 }
 
 .reveal .scenario-steps .step-no {
