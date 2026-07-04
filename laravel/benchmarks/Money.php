@@ -50,4 +50,13 @@ final class Money
     {
         return $this->amount;
     }
+
+    /**
+     * 値オブジェクトの等価判定。中身は int 同士の === 比較なので、
+     * JIT がインライン化すれば getter 直比較と同じ命令に潰れる。
+     */
+    public function equal(Money $other): bool
+    {
+        return $this->amount === $other->amount;
+    }
 }

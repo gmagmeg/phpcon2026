@@ -578,7 +578,7 @@ ol.emph-middle-list li {
     display: grid;
     grid-template-columns: 56px 1fr;
     gap: 16px;
-    align-items: start;
+    align-items: center;
     padding: 0;
 }
 
@@ -613,7 +613,7 @@ ol.emph-middle-list li {
     justify-content: center;
     width: 56px;
     height: 56px;
-    border-radius: 999px;
+    border-radius: 8px;
     background: var(--accent);
     color: #ffffff;
     font-size: 0.95em;

@@ -7,58 +7,56 @@ namespace App\Benchmarks;
 use PhpBench\Attributes as Bench;
 
 /**
- * 比較演算子の計測（== vs ===）。
+ * 値オブジェクトの等価判定：getter 直比較 vs equal() メソッド（DDD 風）。
  *
- * 結論: JIT は型が揃えば == / === の差を消す。差が残るのは coercion のときだけ。
- *   D1 int === int      : 1 命令の整数比較に特殊化
- *   D2 int == int       : D1 と同じ命令に潰れ差が消える
- *   D3 int == 数値文字列 : 突出して遅い・JIT でも縮まらない（強制変換は C 側）
- *   D4 int === string   : 型不一致で即 false、安い
+ * ドメイン: 振替の「金額の一致判定（Money）」。同じ等価判定を 2 通りで書く。
+ *
+ *   D1 getter 直比較 : $priceA->amount() === $priceB->amount()
+ *                      呼び出し側で getter を 2 回叩き、生の int を === で突き合わせる
+ *   D2 equal() 呼び出し: $priceA->equal($priceB)
+ *                      VO にカプセル化した等価判定。中身は int 同士の ===
+ *
+ * 型付き VO 同士なら、JIT は equal() をインライン化し、getter アクセスも
+ * プロパティのスロットアクセスに落とす。結果、D2 は D1 と同じ 1 命令の
+ * 整数比較に潰れ、メソッドで包んでも速度差は出ない。
  *
  * 注意:
  *   - 値はプロパティ経由で渡す（リテラル直書きだと定数畳み込みされ、比較自体が消えうる）。
  *   - 結果も $sink プロパティに残して DCE を防ぐ。
- *   - == の正しさの落とし穴（0 == "a" 等）は性能とは別軸。混ぜない。
  *
  *   docker compose exec app vendor/bin/phpbench run benchmarks/CompareBench.php --report=aggregate
  *   # JIT OFF で比較:
  *   docker compose exec app vendor/bin/phpbench run benchmarks/CompareBench.php --report=aggregate \
  *     --php-config='opcache.jit_buffer_size: 0'
  */
+#[Bench\BeforeMethods('setUp')]
 #[Bench\Warmup(2)]
 #[Bench\Revs(10000000)]
 #[Bench\Iterations(5)]
 class CompareBench
 {
-    private int $a = 12345;
+    /** 型付き VO：金額（内容一致・別インスタンス） */
+    private Money $priceA;
 
-    private int $b = 12345;
-
-    private string $s = '12345';
+    private Money $priceB;
 
     private bool $sink = false;
 
-    /** D1: int === int */
-    public function benchIdenticalIntInt(): void
+    public function setUp(): void
     {
-        $this->sink = $this->a === $this->b;
+        $this->priceA = new Money(12345);
+        $this->priceB = new Money(12345);
     }
 
-    /** D2: int == int */
-    public function benchEqualIntInt(): void
+    /** D1: getter 直比較（int 同士の ===） */
+    public function benchGetterIdentical(): void
     {
-        $this->sink = $this->a == $this->b;
+        $this->sink = $this->priceA->amount() === $this->priceB->amount();
     }
 
-    /** D3: int == 数値文字列（強制変換） */
-    public function benchEqualIntNumStr(): void
+    /** D2: equal() メソッド呼び出し（VO にカプセル化した等価判定） */
+    public function benchEqualMethod(): void
     {
-        $this->sink = $this->a == $this->s;
-    }
-
-    /** D4: int === string（型不一致 → false） */
-    public function benchIdenticalIntStr(): void
-    {
-        $this->sink = $this->a === $this->s;
+        $this->sink = $this->priceA->equal($this->priceB);
     }
 }

@@ -454,6 +454,77 @@ foreach ($strings as $s) {
 			<h2>実はオブジェクト指向・DDD には恩恵が大きい</h2>
 		</section>
 
+		<!-- ============================================================ -->
+		<!-- Laravel のメソッドと JIT（Eloquent / Container） -->
+		<!-- ============================================================ -->
+		<section>
+			<h2>Laravel のメソッドでも確かめる</h2>
+			<p>フレームワークの「クラスで包んだ処理」に JIT はどこまで効くか</p>
+			<ul class="emph-middle-list">
+				<li>Eloquent の属性アクセス（<code>$model->prop</code> / <code>$model['prop']</code>）</li>
+				<li>計算アクセサ vs datetime キャスト</li>
+				<li>サービスコンテナの解決（autowire vs クロージャ束縛）</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>Eloquent 属性アクセス：アロー vs 配列記法</h2>
+			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
+// Model は ArrayAccess 実装。2 記法とも getAttribute に合流する
+$order->price;    // マジック __get → getAttribute
+$order['price'];  // ArrayAccess::offsetGet → getAttribute
+			</code></pre>
+			<table class="compare-table small">
+				<thead><tr><th>記法</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+				<tbody>
+					<tr><td><code>$order->price</code></td><td>0.76μs</td><td>0.62μs</td><td>0.62μs</td></tr>
+					<tr><td><code>$order['price']</code></td><td>0.77μs</td><td>0.61μs</td><td>0.61μs</td></tr>
+				</tbody>
+			</table>
+			<p class="small">記法での差はほぼ無い（同じ <code>getAttribute</code> 経路）。JIT で <strong>~18%</strong> 短縮。<span class="key">書き方は好みで OK</span>。</p>
+		</section>
+
+		<section>
+			<h2>差が出るのは「記法」ではなく「中身」</h2>
+			<table class="compare-table small">
+				<thead><tr><th>属性の中身</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+				<tbody>
+					<tr><td>素のカラム値</td><td>0.76μs</td><td>0.62μs</td><td>0.62μs</td></tr>
+					<tr><td>計算アクセサ（price×qty）</td><td>2.76μs</td><td>2.31μs</td><td>2.31μs</td></tr>
+					<tr class="highlight"><td>datetime キャスト（Carbon）</td><td>5.45μs</td><td>4.08μs</td><td>4.07μs</td></tr>
+				</tbody>
+			</table>
+			<p class="small">JIT はどれも userland 機構を 15〜25% 削る。ただし <strong>datetime は Carbon 構築（C 側）が上乗せ</strong>され、JIT 後も素の属性の <span class="key">約 6.6 倍</span>。「アクセサが何をしているか」でコストが決まる。<span class="small">（1 アクセス）</span></p>
+		</section>
+
+		<section>
+			<h2>サービスコンテナ解決：autowire vs クロージャ束縛</h2>
+			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
+$app->make(Foo::class);   // autowire＝Reflection で依存を解決
+// vs
+$app->bind(Foo::class, fn () => new Foo(new Bar()));
+$app->make(Foo::class);   // 束縛済みクロージャを実行するだけ
+			</code></pre>
+			<table class="compare-table small">
+				<thead><tr><th>解決方法</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+				<tbody>
+					<tr class="highlight"><td>autowire（Reflection）</td><td>3.72μs</td><td>2.87μs</td><td>2.86μs</td></tr>
+					<tr><td>クロージャ束縛</td><td>1.52μs</td><td>1.19μs</td><td>1.19μs</td></tr>
+				</tbody>
+			</table>
+			<p class="small">autowire も JIT で 23% 速くなる（<code>make()</code> 自体は userland）。だが <strong>Reflection＋依存の再帰解決が残り</strong>、JIT 後もクロージャの <span class="key">約 2.4 倍</span>。解決結果はキャッシュ／per-request で make しない。<span class="small">（1 解決）</span></p>
+		</section>
+
+		<section>
+			<h2>Laravel × JIT：総括</h2>
+			<ul class="emph-middle-list">
+				<li>記法（<code>-></code> / <code>[]</code>）では変わらない — 同じメソッドに合流するから</li>
+				<li>JIT は Laravel のメソッド機構（userland）を <span class="key">15〜25% 削る</span></li>
+				<li>ただし <strong>C 側（Carbon）・Reflection・機構コスト</strong>は JIT 後も残り、素の配列/クロージャには届かない</li>
+			</ul>
+			<p style="text-align:center"><span class="key emph-1_2x">「クラスで包んだ計算」には効くが<br>フレームワークの重い中身までは肩代わりしない</span></p>
+		</section>
+
 		<section>
 			<h2>JIT の 2 つの mode：function と tracing</h2>
 			<ul class="emph-middle-list">
@@ -668,62 +739,50 @@ $mutable->subtractAmount(...);
 				</div>
 			</div>
 		</section>
-		<section>
-todo：継承パターンの計測結果を追加する
-		</section>
 
 		<section>
-			<h2>3-4. 代入の計測（コンストラクタ代入）</h2>
-			<pre style="font-size:.52em"><code data-trim data-noescape class="language-php">
-final class TypedPoint {
-    public function __construct(
-        private readonly int $x,
-        private readonly int $y,
-    ) {}
-}
-final class LoosePoint {
-    private $x; private $y;
-    public function __construct($x, $y) { $this->x = $x; $this->y = $y; }
+			<h2>3-4. 値オブジェクトの等価判定：getter 直比較 vs <code>equal()</code></h2>
+			<pre style="font-size:.4em"><code data-trim data-noescape class="language-php">
+// 型付き VO（Money = readonly int）
+$priceA = new Money(12345);
+$priceB = new Money(12345); // 同額・別インスタンス
+
+// 同じ等価判定を 2 通りで書く
+$priceA->amount() === $priceB->amount(); // D1 getter 直比較
+$priceA->equal($priceB);                 // D2 equal() メソッド
+
+// Money::equal() の中身は int 同士の ===
+public function equal(Money $o): bool {
+    return $this->amount === $o->amount;
 }
 			</code></pre>
 		</section>
 
 		<section>
-			<h2>計測結果：型付き vs 型なしコンストラクタ</h2>
-			<table class="compare-table">
-				<thead><tr><th>水準</th><th>内容</th><th>JIT ON での読み筋</th></tr></thead>
+			<h2>計測結果</h2>
+			<table class="compare-table small">
+				<thead><tr><th>水準</th><th>比較</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
 				<tbody>
-					<tr class="highlight"><td>TypedPoint</td><td><code>readonly int</code> プロパティ</td><td><span class="key">代入時の型検証が省かれる</span>（refcount 不要）</td></tr>
-					<tr><td>LoosePoint</td><td>型なしプロパティ</td><td>汎用代入パスが残り改善は鈍い</td></tr>
+					<tr><td>D1</td><td>getter 直比較 <code>===</code></td><td>54ns</td><td>27ns</td><td>26ns</td></tr>
+					<tr class="highlight"><td>D2</td><td><code>equal()</code> メソッド</td><td>43ns</td><td>28ns</td><td>27ns</td></tr>
 				</tbody>
 			</table>
 		</section>
-
 		<section>
-			<h2>3-4. 比較演算子：<code>==</code> vs <code>===</code></h2>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
-private int    $a = 12345;
-private int    $b = 12345;
-private string $s = '12345';
-
-$this->a === $this->b;  // D1: int === int
-$this->a ==  $this->b;  // D2: int == int
-$this->a ==  $this->s;  // D3: int == 数値文字列（強制変換）
-$this->a === $this->s;  // D4: int === string（型不一致 → false）
-			</code></pre>
+			<p class="small">JIT ありならそれほど大きな差は出ず。
+				<br>面白いのはgetter()同士の比較よりも引数渡しの方が早かったこと
+				<br>getter()を２呼ぶ回数分、コストはかかる
+			</p>
 		</section>
 
 		<section>
-			<h2>計測結果：比較演算子（JIT 効果）</h2>
-			<table class="compare-table">
-				<thead><tr><th>水準</th><th>比較</th><th>JIT ON での読み筋</th></tr></thead>
-				<tbody>
-					<tr><td>D1</td><td><code>int === int</code></td><td>1 命令の整数比較に特殊化</td></tr>
-					<tr class="highlight"><td>D2</td><td><code>int == int</code></td><td><span class="key">D1 と同じ命令に潰れ差が消える</span></td></tr>
-					<tr><td>D3</td><td><code>int == 数値文字列</code></td><td>突出して遅い・JIT でも縮まらない（強制変換は C 側）</td></tr>
-					<tr><td>D4</td><td><code>int === string</code></td><td>型不一致で即 false、安い</td></tr>
-				</tbody>
-			</table>
+			<h2>値オブジェクトの等価判定：総括</h2>
+			<ul class="emph-middle-list">
+				<li>getter 直比較も <code>equal()</code> メソッドも、JIT 後は <span class="key">同じ ~26ns に潰れる</span>（同じ命令に特殊化）</li>
+				<li>型付き VO 同士なら <code>equal()</code> の呼び出しを <strong>JIT がインライン化</strong> ＝ カプセル化のコストはゼロ</li>
+				<li>JIT が無くても <code>equal()</code> は不利にならない（getter 2 回より呼び出し 1 回が安い）</li>
+			</ul>
+			<p style="text-align:center">「速いから getter を晒す」のではなく<br><span class="key emph-1_2x">「VO に <code>equal()</code> を持たせる」設計を選んでよい</span></p>
 		</section>
 
 		<section>
