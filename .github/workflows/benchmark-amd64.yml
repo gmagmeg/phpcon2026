@@ -3,13 +3,15 @@ name: Benchmark (native amd64)
 # ネイティブ x86_64（GitHub-hosted ubuntu ランナー）で phpbench を回す。
 # ローカル arm64 / エミュ amd64 と違い、これは実 x86_64 上の数値。
 # 手動実行（Actions タブ → Run workflow）。
+#
+# 計測対象はスライドの分類に合わせて 3 ジョブに分割している:
+#   standard … 標準関数（in_array/isset・bcmath・callback・PCRE JIT）
+#   laravel  … Laravel 層（Eloquent 属性・コンテナ解決・Collection/Str・OPcache boot/thin）
+#   ddd      … DDD 層（Money/VO・Transfer/Cart フロー・多態 dispatch）
 
 on:
   workflow_dispatch:
     inputs:
-      benches:
-        description: "計測する phpbench ファイル（laravel/ 相対・スペース区切り）"
-        default: "benchmarks/BcmathBench.php benchmarks/TransferBench.php benchmarks/CompareBench.php"
       time_unit:
         description: "時間単位"
         type: choice
@@ -24,7 +26,48 @@ concurrency:
 
 jobs:
   bench:
+    name: bench (${{ matrix.category }})
     runs-on: ubuntu-latest        # GitHub-hosted ランナーはネイティブ x86_64
+    strategy:
+      fail-fast: false            # 1 カテゴリが落ちても他は流す
+      matrix:
+        include:
+          # ── 標準関数：JIT が効きにくい内部関数中心 ──
+          - category: standard
+            benches: >-
+              benchmarks/InArrayBench.php
+              benchmarks/BcmathBench.php
+              benchmarks/CallbackBench.php
+              benchmarks/PcreJitBench.php
+            shell: ""
+          # ── Laravel：フレームワーク層 / OPcache の効きどころ ──
+          - category: laravel
+            benches: >-
+              benchmarks/LaravelBench.php
+              benchmarks/EloquentAttributeBench.php
+              benchmarks/EloquentPropertyBench.php
+              benchmarks/ContainerResolveBench.php
+              benchmarks/CollectionBench.php
+              benchmarks/StrBench.php
+            shell: "bench/laravel_boot_bench.sh bench/thin_bench.sh"
+          # ── DDD：型付き VO / ドメインロジック / 多態 ──
+          - category: ddd
+            benches: >-
+              benchmarks/MoneyBench.php
+              benchmarks/CompareBench.php
+              benchmarks/ConstructBench.php
+              benchmarks/HotLoopBench.php
+              benchmarks/TransferBench.php
+              benchmarks/TransferAccumulatorBench.php
+              benchmarks/TransferAnalyticsBench.php
+              benchmarks/TransferBranchBench.php
+              benchmarks/TransferDispatchBench.php
+              benchmarks/TransferHotLoopBench.php
+              benchmarks/InheritanceDispatchBench.php
+              benchmarks/CartCheckoutArrayBench.php
+              benchmarks/CartCheckoutTypedBench.php
+              benchmarks/CartCheckoutTypedLeanBench.php
+            shell: ""
     defaults:
       run:
         working-directory: laravel  # compose.yaml / Dockerfile はここ
@@ -43,9 +86,11 @@ jobs:
         env:
           IMG: performance-php-app          # compose がビルドするイメージ名
           TU: ${{ inputs.time_unit }}
-          BENCHES: ${{ inputs.benches }}
+          BENCHES: ${{ matrix.benches }}
+          CATEGORY: ${{ matrix.category }}
         run: |
           set -euo pipefail
+          echo "対象ベンチ [${CATEGORY}]: $BENCHES"
 
           # イメージには .env を焼き込んでいない（.dockerignore 済み）ため、
           # エントリポイントが起動時に .env を生成＆composer は焼き込み済み。
@@ -59,7 +104,7 @@ jobs:
           }
 
           {
-            echo "## Benchmark results — native amd64 ($(uname -m))"
+            echo "## Benchmark results — ${CATEGORY} — native amd64 ($(uname -m))"
             echo ""
             echo "CPU: \`$(lscpu | awk -F: '/Model name/{print $2; exit}' | xargs)\`"
             echo ""
@@ -77,4 +122,35 @@ jobs:
             run_mode "tracing"  --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: tracing'
 
             echo '```' >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Run shell benchmarks (OPcache boot / thin scripts)
+        if: matrix.shell != ''
+        env:
+          IMG: performance-php-app
+          SHELL_BENCHES: ${{ matrix.shell }}
+        run: |
+          set -euo pipefail
+
+          # bench/ 配下はスクリプト内で OPcache OFF/ON を自前で切り替える別系統
+          # （§2「OPcache の効くケース／薄いスクリプト」の計測）。
+          # phpbench の 3 モードループには乗せず、そのまま実行して要約に貼る。
+          run_sh () {   # $1=スクリプトパス
+            local script="$1"
+            {
+              echo "### $(basename "$script")"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            docker run --rm "$IMG" sh "$script" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          {
+            echo ""
+            echo "## Shell benchmarks — OPcache (native amd64)"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for SH in $SHELL_BENCHES; do
+            run_sh "$SH"
           done
