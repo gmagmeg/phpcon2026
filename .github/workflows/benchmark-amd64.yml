@@ -1,0 +1,80 @@
+name: Benchmark (native amd64)
+
+# ネイティブ x86_64（GitHub-hosted ubuntu ランナー）で phpbench を回す。
+# ローカル arm64 / エミュ amd64 と違い、これは実 x86_64 上の数値。
+# 手動実行（Actions タブ → Run workflow）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      benches:
+        description: "計測する phpbench ファイル（laravel/ 相対・スペース区切り）"
+        default: "benchmarks/BcmathBench.php benchmarks/TransferBench.php benchmarks/CompareBench.php"
+      time_unit:
+        description: "時間単位"
+        type: choice
+        options:
+          - microseconds
+          - milliseconds
+        default: microseconds
+
+concurrency:
+  group: benchmark-amd64-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest        # GitHub-hosted ランナーはネイティブ x86_64
+    defaults:
+      run:
+        working-directory: laravel  # compose.yaml / Dockerfile はここ
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CPU / arch info
+        run: |
+          echo "arch: $(uname -m)"
+          lscpu | grep -E 'Architecture|Model name|^CPU\(s\)|MHz' || true
+
+      - name: Build app image (native amd64)
+        run: docker compose build app
+
+      - name: Run benchmarks (JIT OFF / function / tracing)
+        env:
+          IMG: performance-php-app          # compose がビルドするイメージ名
+          TU: ${{ inputs.time_unit }}
+          BENCHES: ${{ inputs.benches }}
+        run: |
+          set -euo pipefail
+
+          # イメージには .env を焼き込んでいない（.dockerignore 済み）ため、
+          # エントリポイントが起動時に .env を生成＆composer は焼き込み済み。
+          # volume はマウントしない（マウントすると CI 上に vendor が無く壊れる）。
+          run_mode () {   # $1=label  $2..=phpbench の追加フラグ
+            local label="$1"; shift
+            echo "-- JIT ${label} --" | tee -a "$GITHUB_STEP_SUMMARY"
+            docker run --rm "$IMG" \
+              php vendor/bin/phpbench run "$BENCH" --report=aggregate --time-unit="$TU" "$@" 2>&1 \
+              | grep -E '^\| ' | tee -a "$GITHUB_STEP_SUMMARY" || true
+          }
+
+          {
+            echo "## Benchmark results — native amd64 ($(uname -m))"
+            echo ""
+            echo "CPU: \`$(lscpu | awk -F: '/Model name/{print $2; exit}' | xargs)\`"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for BENCH in $BENCHES; do
+            name=$(basename "$BENCH" .php)
+            {
+              echo "### ${name}"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            run_mode "OFF"      --php-config='opcache.jit_buffer_size: 0'
+            run_mode "function" --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: function'
+            run_mode "tracing"  --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: tracing'
+
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          done

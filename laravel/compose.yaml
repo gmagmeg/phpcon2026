@@ -24,6 +24,28 @@ services:
       - ./:/app
     restart: unless-stopped
 
+  # PHP 8.5 (PHP-FPM) — x86_64(amd64) 版。同じ Dockerfile を platform 指定で。
+  # Apple Silicon 上ではエミュレーション動作（計測の絶対値比較には非推奨）。
+  app-amd64:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: performance-php-app-amd64
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OPCACHE_ENABLE: "${OPCACHE_ENABLE:-1}"
+      OPCACHE_ENABLE_CLI: "${OPCACHE_ENABLE_CLI:-1}"
+      OPCACHE_VALIDATE_TIMESTAMPS: "${OPCACHE_VALIDATE_TIMESTAMPS:-1}"
+      OPCACHE_JIT: "${OPCACHE_JIT:-tracing}"
+      OPCACHE_JIT_BUFFER_SIZE: "${OPCACHE_JIT_BUFFER_SIZE:-128M}"
+      OPCACHE_MEMORY: "${OPCACHE_MEMORY:-256}"
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+
   # nginx — Webサーバー
   web:
     image: nginx:1.27-bookworm
