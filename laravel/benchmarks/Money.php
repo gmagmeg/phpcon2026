@@ -36,6 +36,18 @@ final class Money
         return new self($this->amount * $f);
     }
 
+    /** 率割引などに使う「N パーセント分」。端数は切り捨て。 */
+    public function percent(int $percent): self
+    {
+        return new self(intdiv($this->amount * $percent, 100));
+    }
+
+    /** 小さい方を返す（定額クーポンが小計を超えないよう丸める用途）。 */
+    public function min(Money $other): self
+    {
+        return $this->amount <= $other->amount ? $this : $other;
+    }
+
     public function isPositive(): bool
     {
         return $this->amount > 0;

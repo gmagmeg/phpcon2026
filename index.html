@@ -468,9 +468,8 @@ foreach ($strings as $s) {
 		</section>
 
 		<section>
-			<h2>Eloquent 属性アクセス：アロー vs 配列記法</h2>
+			<h2>Eloquent 属性アクセス</h2>
 			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
-// Model は ArrayAccess 実装。2 記法とも getAttribute に合流する
 $order->price;    // マジック __get → getAttribute
 $order['price'];  // ArrayAccess::offsetGet → getAttribute
 			</code></pre>
@@ -481,12 +480,29 @@ $order['price'];  // ArrayAccess::offsetGet → getAttribute
 					<tr><td><code>$order['price']</code></td><td>0.77μs</td><td>0.61μs</td><td>0.61μs</td></tr>
 				</tbody>
 			</table>
-			<p class="small">記法での差はほぼ無い（同じ <code>getAttribute</code> 経路）。JIT で <strong>~18%</strong> 短縮。<span class="key">書き方は好みで OK</span>。</p>
+		</section>
+		<section>
+			<p class="small">記法での差はほぼ無い。JIT で <strong>~18%</strong> 短縮。<br>速度面だけ考えるのなら、書き方は好みで OK。</p>
 		</section>
 
 		<section>
-			<h2>差が出るのは「記法」ではなく「中身」</h2>
-			<table class="compare-table small">
+			<h2>何を計測したか：属性の「中身」</h2>
+			<pre style="font-size:.36em; margin:.2em 0;"><code data-trim data-noescape class="language-php">
+class BenchOrder extends Model {                    // 計測対象モデル（テーブル不要）
+    protected function total(): Attribute       // 計算アクセサ＝純 PHP 算術
+    { return Attribute::make(get: fn () =&gt; $this-&gt;price * $this-&gt;qty); }
+    protected function casts(): array           // datetime＝Carbon 構築（C 側）
+    { return ['due_at' =&gt; 'datetime']; }
+}
+$order-&gt;price;    // 素のカラム値       $order-&gt;total;    // 計算アクセサ
+$order-&gt;due_at;   // datetime キャスト   // ← 各 100,000 revs × 5 iter で計測
+			</code></pre>
+			<p class="small">同じ「プロパティを 1 回読むだけ」でも中身は割れる。<strong>計算アクセサ</strong>は <code>price × qty</code> の純 PHP 算術、<strong>datetime キャスト</strong>は <code>Carbon</code> 構築（日付パース＝C 側＋オブジェクト生成）。<span class="key">アクセサが何をしているか</span>で JIT の効き幅が変わる。</p>
+		</section>
+
+		<section>
+			<h2>計測結果：中身が違えば差が出てくる</h2>
+			<table class="compare-table">
 				<thead><tr><th>属性の中身</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
 				<tbody>
 					<tr><td>素のカラム値</td><td>0.76μs</td><td>0.62μs</td><td>0.62μs</td></tr>
@@ -494,7 +510,17 @@ $order['price'];  // ArrayAccess::offsetGet → getAttribute
 					<tr class="highlight"><td>datetime キャスト（Carbon）</td><td>5.45μs</td><td>4.08μs</td><td>4.07μs</td></tr>
 				</tbody>
 			</table>
-			<p class="small">JIT はどれも userland 機構を 15〜25% 削る。ただし <strong>datetime は Carbon 構築（C 側）が上乗せ</strong>され、JIT 後も素の属性の <span class="key">約 6.6 倍</span>。「アクセサが何をしているか」でコストが決まる。<span class="small">（1 アクセス）</span></p>
+			<p class="small">列は <code>opcache.jit</code> 設定（OFF / function / tracing）。値は 1 アクセスあたり（100,000 revs × 5 iter の平均）。</p>
+		</section>
+
+		<section>
+			<h2>速度の総評</h2>
+			<ul style="display:block; box-sizing:border-box;">
+				<li>JIT はどれも userland 機構（ディスパッチ＋算術）を <span class="key">15〜25%</span> 削る</li>
+				<li>ただし <strong>datetime は Carbon 構築（C 側）が上乗せ</strong>され、JIT 後も素の属性の <span class="key">約 6.6 倍</span>のまま</li>
+				<li>JIT が届くのは PHP バイトコード。C 側の処理（日付パース・オブジェクト生成）はすり抜ける</li>
+				<li>結論：<strong>「アクセサが何をしているか」でコストが決まる</strong></li>
+			</ul>
 		</section>
 
 		<section>
@@ -660,6 +686,96 @@ $statements->applyReceipt($receipt);
 			</table>
 			<p class="small">配列 = 連想配列版 / VO = 型付き VO 版</p>
 			<p>JIT なし：手続きが高速<br>JIT あり：型付き VO が高速</p>
+			<aside class="notes">
+				計測環境の記録：本スライドの数値は ARM64 環境では再現しない。
+				再計測環境は ARM64（aarch64 / Apple Silicon・Docker, PHP 8.5.7）。
+				正しい計測には phpbench の --php-config を JSON 形式で渡す必要がある
+				（例: --php-config='{"opcache.jit_buffer_size": 0}'）。
+				この環境で再計測（100 revs × 10 it）すると:
+				配列 OFF 7.42ms → tracing 4.97ms（約 1.49 倍速・スライドとほぼ一致）、
+				VO   OFF 18.16ms → tracing 14.16ms（約 1.28 倍速）。
+				VO tracing の 3.847ms（4.66 倍速）は再現せず、ARM64 では約 14ms のまま。
+				＝ VO は tracing でも配列より遅い。元の VO tracing 値は別アーキ（x86-64 前提）
+				の可能性が高い（PHP の JIT はアーキごとに別実装で、ARM64 対応は比較的新しい）。
+			</aside>
+		</section>
+
+		<section>
+			<h2>次の題材：クーポン割引・送料計算</h2>
+			<p class="small">EC のカート確定処理を、同じ 2 実装（連想配列版 / 型付き VO 版）で計測する</p>
+			<ul class="scenario-steps">
+				<li>
+					<span class="step-no">1</span>
+					<p><strong>小計</strong> カート明細（単価 × 数量）を合計する</p>
+				</li>
+				<li>
+					<span class="step-no">2</span>
+					<p><strong>割引</strong> 適用クーポンで割引額を算出する（定額 / 率 / 条件付き）</p>
+				</li>
+				<li>
+					<span class="step-no">3</span>
+					<p><strong>送料</strong> 配送地域 × 重量から送料を算出する（無料ライン判定あり）</p>
+				</li>
+				<li>
+					<span class="step-no">4</span>
+					<p><strong>確定</strong> 小計 − 割引 ＋ 送料 で請求額を確定する</p>
+				</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>やること（TODO）</h2>
+			<ul class="emph-middle-list" style="display:block; box-sizing:border-box;">
+				<li>☐ <strong>連想配列版</strong>と<strong>型付き VO 版</strong>の 2 実装を用意（前例と同じ対比軸）</li>
+				<li>☐ クーポンを<strong>ポリモーフィズム</strong>で実装（<code>FixedCoupon</code> / <code>RateCoupon</code> / <code>ThresholdCoupon</code>）</li>
+				<li>☐ 送料を「<strong>配送地域 × 重量</strong>」テーブル ＋ 無料ライン判定で実装</li>
+				<li>☐ <code>phpbench</code> で <strong>JIT OFF / function / tracing</strong> の 3 条件を計測</li>
+				<li>☐ 観点：<strong>手続き vs VO</strong> と <strong>多態 dispatch の JIT インライン化</strong></li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>実装：クーポンはポリモーフィズム</h2>
+			<pre style="font-size:.36em; margin:.2em 0;"><code data-trim data-noescape class="language-php">
+interface Coupon { public function discountFor(Money $subtotal): Money; }
+final class FixedCoupon     implements Coupon { /* 小計を超えない定額   */ }
+final class RateCoupon      implements Coupon { /* 小計の N%           */ }
+final class ThresholdCoupon implements Coupon { /* 閾値以上で固定額     */ }
+
+// 型付き VO 版：小計 → 割引 → 送料 → 確定
+$subtotal = Money::zero();
+foreach ($cart-&gt;lines as $line) $subtotal = $subtotal-&gt;add($line-&gt;subtotal());
+$discount   = $cart-&gt;coupon-&gt;discountFor($subtotal);   // ← 多態 dispatch
+$discounted = $subtotal-&gt;subtract($discount);
+$shipping   = $policy-&gt;feeFor($discounted, $region, $weight);  // 地域×重量
+$total      = $discounted-&gt;add($shipping);
+			</code></pre>
+			<p class="small">配列版は同じルールを <code>switch ($spec['type'])</code> の手続き分岐で実装（<code>CartCheckoutArrayBench</code>）。VO 版は上記クラス群（<code>CartCheckoutTypedBench</code>）。5,000 カート × 4 明細、両版で結果一致を検証済み。</p>
+		</section>
+
+		<section>
+			<h2>計測結果：alloc を削ると JIT が効く</h2>
+			<table class="compare-table">
+				<thead><tr><th>実装</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
+				<tbody>
+					<tr><td>配列</td><td>1.60ms</td><td>1.03ms</td><td>0.94ms</td><td><span class="key">約 1.70 倍速</span></td></tr>
+					<tr><td>VO</td><td>8.96ms</td><td>7.44ms</td><td>6.53ms</td><td><span class="key">約 1.37 倍速</span></td></tr>
+					<tr class="highlight"><td>VO（低alloc）</td><td>2.92ms</td><td>1.95ms</td><td>1.43ms</td><td><span class="key">約 2.04 倍速</span></td></tr>
+				</tbody>
+			</table>
+			<p class="small">配列 = 連想配列版 / VO = 型付き VO 版 / 低alloc = ループ内 new を排した VO（PHP 8.5.7 / ARM64・100 revs × 5 it）</p>
+			<p>VO の重さは <strong>Money 生成（C 側 alloc）</strong>。ループ内の new を削ると <strong>JIT が約 2 倍効き</strong>、tracing で配列に迫る。</p>
+		</section>
+
+		<section>
+			<h2>効き幅の差：バイトコード vs C 側</h2>
+			<ul style="display:block; box-sizing:border-box;">
+				<li>配列版は <strong>int 演算＋配列アクセス</strong>主体 → JIT がバイトコードを特殊化 → <span class="key">約 1.70 倍速</span></li>
+				<li>VO 版は <strong><code>new Money()</code> のオブジェクト生成（C 側 alloc）</strong>が残る → JIT が届かず効きは薄い（<span class="key">約 1.37 倍</span>）</li>
+				<li>多態 <code>discountFor()</code> も 3 型混在で virtual call が残りインライン化されにくい</li>
+				<li>参考：<strong>純粋な整数ループ</strong>なら tracing で <span class="key">約 9 倍速</span>（JIT が最も効く形）</li>
+				<li>結論：<strong>JIT はバイトコードを速くする</strong>。VO の生成コストは C 側に残り、<span class="key">効き幅も絶対値も差が残る</span>（datetime／Carbon と同じ構図）</li>
+			</ul>
 		</section>
 
 		<section>
