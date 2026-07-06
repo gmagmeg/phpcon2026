@@ -254,6 +254,20 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 			</ul>
 		</section>
 
+		<section>
+			<h2>計測環境（JIT 章）</h2>
+			<table class="compare-table">
+				<tbody>
+					<tr><td>CPU / アーキ</td><td>ネイティブ <span class="key">x86_64</span>（AMD EPYC 7763 / GitHub Actions <code>ubuntu-latest</code>）</td></tr>
+					<tr><td>実行基盤</td><td>Docker（<code>php:8.5-fpm-bookworm</code>）</td></tr>
+					<tr><td>PHP</td><td>8.5（OPcache 前提）</td></tr>
+					<tr><td>JIT モード</td><td><code>OFF</code> / <code>function</code> / <code>tracing</code> の 3 通りで比較（<code>jit_buffer_size</code> = 0 / 64M）</td></tr>
+					<tr><td>計測ライブラリ</td><td>PHPBench（warmup 2・revs × its はベンチ毎）</td></tr>
+				</tbody>
+			</table>
+			<p class="small">JIT はアーキごとに別実装。本章の数値は <span class="key">x86_64 ネイティブ</span>での計測で、ARM64 では再現しない場合がある。</p>
+		</section>
+
 		<section class="center-punch">
 			<p><span class="key">JIT が効くのはここ</span></p>
 			<img class="concept-svg" src="images/jit-flow.svg" style="max-width:1040px;max-height:62vh;margin-top:0.3em"
@@ -319,20 +333,20 @@ DO_ICALL
 			<p>呼び出しまでのフロー</p>
 			<div style="display:flex;flex-direction:column;align-items:center;gap:.6em;margin-top:.6em">
 				<!-- PHP コード -->
-				<div style="background:#eef3fb;border-radius:10px;padding:.5em 1.2em;width:72%">
-					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.65em">PHP コード</p>
+				<div style="padding:.5em 1.2em;width:72%">
+					<p style="font-weight:700;font-size:.65em">PHP コード</p>
 					<pre style="margin:.2em 0 0 0;font-size:.55em"><code data-trim data-noescape class="language-php">in_array($needle, $values, true);</code></pre>
 				</div>
 				<p style="margin:0;color:#134aa9;font-size:.55em">↓ </p>
 				<!-- OPCODE -->
-				<div style="background:#eef3fb;border-radius:10px;padding:.5em 1.2em;width:72%">
-					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.65em">OPCODE（JIT/OPcache の対象）</p>
+				<div style="padding:.5em 1.2em;width:72%">
+					<p style="font-weight:700;font-size:.65em">OPCODE（JIT/OPcache の対象）</p>
 					<pre style="margin:.2em 0 0 0;font-size:.55em"><code data-trim data-noescape class="language-c">DO_ICALL   in_array</code></pre>
 				</div>
 				<p style="margin:0;color:#134aa9;font-size:.55em">↓</p>
 				<!-- C 側マクロ -->
-				<div style="background:#eef3fb;border-radius:10px;padding:.5em 1.2em;width:72%">
-					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.65em">C 側マクロ（JIT/OPcache の対象外）</p>
+				<div style="padding:.5em 1.2em;width:72%">
+					<p style="font-weight:700;font-size:.65em">C 側マクロ（JIT/OPcache の対象外）</p>
 					<pre style="margin:.2em 0 0 0;font-size:.5em"><code data-trim data-noescape class="language-c">PHP_FUNCTION(in_array) → zif_in_array()</code></pre>
 				</div>
 			</div>
@@ -660,17 +674,6 @@ $statements->applyReceipt($receipt);
 		</section>
 
 		<section>
-			<h2>やること（TODO）</h2>
-			<ul class="emph-middle-list" style="display:block; box-sizing:border-box;">
-				<li>☐ <strong>連想配列版</strong>と<strong>型付き VO 版</strong>の 2 実装を用意（前例と同じ対比軸）</li>
-				<li>☐ クーポンを<strong>ポリモーフィズム</strong>で実装（<code>FixedCoupon</code> / <code>RateCoupon</code> / <code>ThresholdCoupon</code>）</li>
-				<li>☐ 送料を「<strong>配送地域 × 重量</strong>」テーブル ＋ 無料ライン判定で実装</li>
-				<li>☐ <code>phpbench</code> で <strong>JIT OFF / function / tracing</strong> の 3 条件を計測</li>
-				<li>☐ 観点：<strong>手続き vs VO</strong> と <strong>多態 dispatch の JIT インライン化</strong></li>
-			</ul>
-		</section>
-
-		<section>
 			<h2>実装：クーポンはポリモーフィズム</h2>
 			<pre style="font-size:.36em; margin:.2em 0;"><code data-trim data-noescape class="language-php">
 interface Coupon { public function discountFor(Money $subtotal): Money; }
@@ -744,38 +747,6 @@ $score += $polys[$i % 3]->score($request, $i); // 多態 dispatch
 				</tbody>
 			</table>
 			<p>わりと横並びの結果に。<br>JIT 導入時はポリモーフィズムの有無で、そこまで気にしなくて良さそう</p>
-		</section>
-
-		<section>
-			<h2>イミュータブル vs ミュータブル</h2>
-			<p class="small">同じ集計処理をオブジェクト生成の有無だけ変えて比較する</p>
-			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
-$total = Money::zero();
-foreach ($requests as $request) {
-    $net = $request->amount->subtract($feePolicy->feeFor($request));
-    $total = $total->add($net); // 毎回 new
-}
-
-$mutable->addAmount(...);
-$mutable->subtractAmount(...);
-			</code></pre>
-			<ul class="emph-middle-list small">
-				<li>イミュータブル = 加算ごとに new</li>
-				<li>ミュータブル = 同じ入れ物を更新</li>
-			</ul>
-		</section>
-
-		<section>
-			<h2>計測結果</h2>
-			<table class="compare-table small">
-				<thead><tr><th></th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
-				<tbody>
-					<tr><td>scalar int</td><td>716.909μs</td><td>357.213μs</td><td>318.588μs</td></tr>
-					<tr class="highlight"><td>イミュータブル</td><td>1.740<strong>ms</strong></td><td>1.296<strong>ms</strong></td><td>1.087<strong>ms</strong></td></tr>
-					<tr><td>ミュータブル</td><td>806.348μs</td><td>562.732μs</td><td>321.264μs</td></tr>
-				</tbody>
-			</table>
-			
 		</section>
 		<section>
 			<h2>JIT を効かせても生成コストは残る</h2>
