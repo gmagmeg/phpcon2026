@@ -43,7 +43,22 @@ class MoneyBench
         $this->sink = $acc;
     }
 
-    /** B: 型付き Money の add / multiply をループ */
+    /**
+     * B: ミュータブル Money。オブジェクトはループ外で 1 度だけ生成し、
+     * 中は破壊的更新で回す（ループ内で new が発生しない）。
+     */
+    public function benchMutableMoney(): void
+    {
+        $acc = 0;
+        $m = new MutableMoney(0);
+        for ($i = 0; $i < self::N; $i++) {
+            $m->set($i)->add($m)->multiply(2);
+            $acc += $m->amount();
+        }
+        $this->sink = $acc;
+    }
+
+    /** C: 型付き（イミュータブル）Money の add / multiply をループ */
     public function benchTypedMoney(): void
     {
         $acc = 0;

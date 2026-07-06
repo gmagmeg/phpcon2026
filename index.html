@@ -319,19 +319,19 @@ DO_ICALL
 			<p>呼び出しまでのフロー</p>
 			<div style="display:flex;flex-direction:column;align-items:center;gap:.6em;margin-top:.6em">
 				<!-- PHP コード -->
-				<div style="background:#eef3fb;border:2.5px solid #134aa9;border-radius:10px;padding:.5em 1.2em;width:72%">
+				<div style="background:#eef3fb;border-radius:10px;padding:.5em 1.2em;width:72%">
 					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.65em">PHP コード</p>
 					<pre style="margin:.2em 0 0 0;font-size:.55em"><code data-trim data-noescape class="language-php">in_array($needle, $values, true);</code></pre>
 				</div>
 				<p style="margin:0;color:#134aa9;font-size:.55em">↓ </p>
 				<!-- OPCODE -->
-				<div style="background:#eef3fb;border:2.5px solid #134aa9;border-radius:10px;padding:.5em 1.2em;width:72%">
+				<div style="background:#eef3fb;border-radius:10px;padding:.5em 1.2em;width:72%">
 					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.65em">OPCODE（JIT/OPcache の対象）</p>
 					<pre style="margin:.2em 0 0 0;font-size:.55em"><code data-trim data-noescape class="language-c">DO_ICALL   in_array</code></pre>
 				</div>
 				<p style="margin:0;color:#134aa9;font-size:.55em">↓</p>
 				<!-- C 側マクロ -->
-				<div style="background:#eef3fb;border:2.5px solid #134aa9;border-radius:10px;padding:.5em 1.2em;width:72%">
+				<div style="background:#eef3fb;border-radius:10px;padding:.5em 1.2em;width:72%">
 					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.65em">C 側マクロ（JIT/OPcache の対象外）</p>
 					<pre style="margin:.2em 0 0 0;font-size:.5em"><code data-trim data-noescape class="language-c">PHP_FUNCTION(in_array) → zif_in_array()</code></pre>
 				</div>
@@ -454,103 +454,6 @@ foreach ($strings as $s) {
 			<h2>実はオブジェクト指向・DDD には恩恵が大きい</h2>
 		</section>
 
-		<!-- ============================================================ -->
-		<!-- Laravel のメソッドと JIT（Eloquent / Container） -->
-		<!-- ============================================================ -->
-		<section>
-			<h2>Laravel のメソッドでも確かめる</h2>
-			<p>フレームワークの「クラスで包んだ処理」に JIT はどこまで効くか</p>
-			<ul class="emph-middle-list">
-				<li>Eloquent の属性アクセス（<code>$model->prop</code> / <code>$model['prop']</code>）</li>
-				<li>計算アクセサ vs datetime キャスト</li>
-				<li>サービスコンテナの解決（autowire vs クロージャ束縛）</li>
-			</ul>
-		</section>
-
-		<section>
-			<h2>Eloquent 属性アクセス</h2>
-			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
-$order->price;    // マジック __get → getAttribute
-$order['price'];  // ArrayAccess::offsetGet → getAttribute
-			</code></pre>
-			<table class="compare-table small">
-				<thead><tr><th>記法</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
-				<tbody>
-					<tr><td><code>$order->price</code></td><td>0.76μs</td><td>0.62μs</td><td>0.62μs</td></tr>
-					<tr><td><code>$order['price']</code></td><td>0.77μs</td><td>0.61μs</td><td>0.61μs</td></tr>
-				</tbody>
-			</table>
-		</section>
-		<section>
-			<p class="small">記法での差はほぼ無い。JIT で <strong>~18%</strong> 短縮。<br>速度面だけ考えるのなら、書き方は好みで OK。</p>
-		</section>
-
-		<section>
-			<h2>何を計測したか：属性の「中身」</h2>
-			<pre style="font-size:.36em; margin:.2em 0;"><code data-trim data-noescape class="language-php">
-class BenchOrder extends Model {                    // 計測対象モデル（テーブル不要）
-    protected function total(): Attribute       // 計算アクセサ＝純 PHP 算術
-    { return Attribute::make(get: fn () =&gt; $this-&gt;price * $this-&gt;qty); }
-    protected function casts(): array           // datetime＝Carbon 構築（C 側）
-    { return ['due_at' =&gt; 'datetime']; }
-}
-$order-&gt;price;    // 素のカラム値       $order-&gt;total;    // 計算アクセサ
-$order-&gt;due_at;   // datetime キャスト   // ← 各 100,000 revs × 5 iter で計測
-			</code></pre>
-			<p class="small">同じ「プロパティを 1 回読むだけ」でも中身は割れる。<strong>計算アクセサ</strong>は <code>price × qty</code> の純 PHP 算術、<strong>datetime キャスト</strong>は <code>Carbon</code> 構築（日付パース＝C 側＋オブジェクト生成）。<span class="key">アクセサが何をしているか</span>で JIT の効き幅が変わる。</p>
-		</section>
-
-		<section>
-			<h2>計測結果：中身が違えば差が出てくる</h2>
-			<table class="compare-table">
-				<thead><tr><th>属性の中身</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
-				<tbody>
-					<tr><td>素のカラム値</td><td>0.76μs</td><td>0.62μs</td><td>0.62μs</td></tr>
-					<tr><td>計算アクセサ（price×qty）</td><td>2.76μs</td><td>2.31μs</td><td>2.31μs</td></tr>
-					<tr class="highlight"><td>datetime キャスト（Carbon）</td><td>5.45μs</td><td>4.08μs</td><td>4.07μs</td></tr>
-				</tbody>
-			</table>
-			<p class="small">列は <code>opcache.jit</code> 設定（OFF / function / tracing）。値は 1 アクセスあたり（100,000 revs × 5 iter の平均）。</p>
-		</section>
-
-		<section>
-			<h2>速度の総評</h2>
-			<ul style="display:block; box-sizing:border-box;">
-				<li>JIT はどれも userland 機構（ディスパッチ＋算術）を <span class="key">15〜25%</span> 削る</li>
-				<li>ただし <strong>datetime は Carbon 構築（C 側）が上乗せ</strong>され、JIT 後も素の属性の <span class="key">約 6.6 倍</span>のまま</li>
-				<li>JIT が届くのは PHP バイトコード。C 側の処理（日付パース・オブジェクト生成）はすり抜ける</li>
-				<li>結論：<strong>「アクセサが何をしているか」でコストが決まる</strong></li>
-			</ul>
-		</section>
-
-		<section>
-			<h2>サービスコンテナ解決：autowire vs クロージャ束縛</h2>
-			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
-$app->make(Foo::class);   // autowire＝Reflection で依存を解決
-// vs
-$app->bind(Foo::class, fn () => new Foo(new Bar()));
-$app->make(Foo::class);   // 束縛済みクロージャを実行するだけ
-			</code></pre>
-			<table class="compare-table small">
-				<thead><tr><th>解決方法</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
-				<tbody>
-					<tr class="highlight"><td>autowire（Reflection）</td><td>3.72μs</td><td>2.87μs</td><td>2.86μs</td></tr>
-					<tr><td>クロージャ束縛</td><td>1.52μs</td><td>1.19μs</td><td>1.19μs</td></tr>
-				</tbody>
-			</table>
-			<p class="small">autowire も JIT で 23% 速くなる（<code>make()</code> 自体は userland）。だが <strong>Reflection＋依存の再帰解決が残り</strong>、JIT 後もクロージャの <span class="key">約 2.4 倍</span>。解決結果はキャッシュ／per-request で make しない。<span class="small">（1 解決）</span></p>
-		</section>
-
-		<section>
-			<h2>Laravel × JIT：総括</h2>
-			<ul class="emph-middle-list">
-				<li>記法（<code>-></code> / <code>[]</code>）では変わらない — 同じメソッドに合流するから</li>
-				<li>JIT は Laravel のメソッド機構（userland）を <span class="key">15〜25% 削る</span></li>
-				<li>ただし <strong>C 側（Carbon）・Reflection・機構コスト</strong>は JIT 後も残り、素の配列/クロージャには届かない</li>
-			</ul>
-			<p style="text-align:center"><span class="key emph-1_2x">「クラスで包んだ計算」には効くが<br>フレームワークの重い中身までは肩代わりしない</span></p>
-		</section>
-
 		<section>
 			<h2>JIT の 2 つの mode：function と tracing</h2>
 			<ul class="emph-middle-list">
@@ -592,12 +495,45 @@ final class Money
 		</section>
 
 		<section>
-			<p class="small">計測内容：プロパティを毎反復読んで加算する</p>
+			<p class="small">計測内容：オブジェクト生成をループ外へ出せるか（new の位置に注目）</p>
+			<div style="display:flex;flex-direction:column;gap:.35em;margin-top:.3em">
+				<div>
+					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">手続き</p>
+					<pre style="margin:.1em 0;font-size:.4em"><code data-trim data-noescape class="language-php">
+for ($i = 0; $i < 1000; $i++) {
+    $acc += ($i + $i) * 2;
+}
+					</code></pre>
+				</div>
+				<div>
+					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">ミュータブル<span style="font-weight:400;font-size:.8em">（new はループ外で1度だけ・中は破壊的更新）</span></p>
+					<pre style="margin:.1em 0;font-size:.4em"><code data-trim data-noescape class="language-php">
+$m = new MutableMoney(0);                     // ← ループ外
+for ($i = 0; $i < 1000; $i++) {
+    $m->set($i)->add($m)->multiply(2);        // in-place（new なし）
+    $acc += $m->amount();
+}
+					</code></pre>
+				</div>
+				<div>
+					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">イミュータブル<span style="font-weight:400;font-size:.8em">（add / multiply が毎回 new する）</span></p>
+					<pre style="margin:.1em 0;font-size:.4em"><code data-trim data-noescape class="language-php">
+for ($i = 0; $i < 1000; $i++) {
+    $m = new Money($i);                        // ← ループ外に出せない
+    $acc += $m->add($m)->multiply(2)->amount();
+}
+					</code></pre>
+				</div>
+			</div>
+		</section>
+
+		<section>
+			<p class="small">計測結果：プロパティを毎反復読んで加算する</p>
 			<table class="compare-table">
 				<thead><tr><th>水準</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
 				<tbody>
-					<tr class="highlight"><td>A: Scalar</td><td>28.6μs</td><td>7.8μs</td><td><span class="key">6.5μs</span></td><td><span class="key">約 4.4 倍速</span></td></tr>
-					<tr><td>B: 型付き</td><td>149.2μs</td><td>83.5μs</td><td>55.1μs</td><td>約 2.7 倍速</td></tr>
+					<tr class="highlight"><td>A: Scalar</td><td>5.69μs</td><td>0.79μs</td><td><span class="key">0.80μs</span></td><td><span class="key">約 7.1 倍速</span></td></tr>
+					<tr><td>B: 型付き</td><td>231.7μs</td><td>168.5μs</td><td>167.8μs</td><td>約 1.4 倍速</td></tr>
 				</tbody>
 			</table>
 		</section>
