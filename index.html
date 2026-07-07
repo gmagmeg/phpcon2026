@@ -255,17 +255,26 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 		</section>
 
 		<section>
-			<h2>計測環境（JIT 章）</h2>
+			<h2>JIT の計測環境</h2>
 			<table class="compare-table">
 				<tbody>
 					<tr><td>CPU / アーキ</td><td>ネイティブ <span class="key">x86_64</span>（AMD EPYC 7763 / GitHub Actions <code>ubuntu-latest</code>）</td></tr>
-					<tr><td>実行基盤</td><td>Docker（<code>php:8.5-fpm-bookworm</code>）</td></tr>
 					<tr><td>PHP</td><td>8.5（OPcache 前提）</td></tr>
 					<tr><td>JIT モード</td><td><code>OFF</code> / <code>function</code> / <code>tracing</code> の 3 通りで比較（<code>jit_buffer_size</code> = 0 / 64M）</td></tr>
-					<tr><td>計測ライブラリ</td><td>PHPBench（warmup 2・revs × its はベンチ毎）</td></tr>
+					<tr><td>計測ライブラリ</td><td>PHPBench</td></tr>
 				</tbody>
 			</table>
-			<p class="small">JIT はアーキごとに別実装。本章の数値は <span class="key">x86_64 ネイティブ</span>での計測で、ARM64 では再現しない場合がある。</p>
+		</section>
+
+		<section>
+			<h2>JIT はアーキごとに別実装</h2>
+			<p>PHP の JIT（DynASM ベース）は、アーキごとにコード生成器が分かれている：</p>
+			<ul class="emph-middle-list">
+				<li><span class="key">x86</span>（32-bit / i386）</li>
+				<li><span class="key">x86_64</span>（64-bit / AMD64）</li>
+				<li><span class="key">ARM64</span>（AArch64 / Apple Silicon 等）</li>
+			</ul>
+			<p class="small">ARM64 対応は比較的新しく、同じコードでも速度が異なる。</p>
 		</section>
 
 		<section class="center-punch">
@@ -305,20 +314,29 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			<h2>計測結果：in_array vs isset</h2>
 			
 			<table class="compare-table">
-				<thead><tr><th>処理</th><th>ON</th><th>OFF</th><th>ON 比</th></tr></thead>
+				<thead><tr><th>処理</th><th>アーキ</th><th>OFF</th><th>ON</th><th>ON 比</th></tr></thead>
 				<tbody>
-					<tr class="highlight"><td>in_array（O(n)）</td><td>11.75μs</td><td>11.88μs</td><td>基準（ON ≒ OFF）</td></tr>
-					<tr><td>isset（O(1)）</td><td>0.079μs</td><td>0.022μs</td><td>約 150 倍速</td></tr>
+					<tr><td>in_array</td><td>ARM64</td><td>11.88μs</td><td>11.75μs</td><td>ー</td></tr>
+					<tr class="highlight"><td>in_array</td><td>x86_64</td><td>12.70μs</td><td>12.84μs</td><td>ー</td></tr>
+					<tr><td>isset</td><td>ARM64</td><td>0.022μs</td><td style="color:#c00;font-weight:700;">0.079μs</td><td>約 150 倍速</td></tr>
+					<tr class="highlight"><td>isset</td><td>x86_64</td><td>0.029μs</td><td style="color:#c00;font-weight:700;">0.083μs</td><td>約 150 倍速</td></tr>
 				</tbody>
 			</table>
-			<p>周知の通り isset の方が高速<br>JIT をオンにしても差は埋まらない</p>
-			<p>むしろ OPcache の分のオーバーヘッドで速度低下</p>
 		</section>
 
 		<section>
-			<h2>JIT が効いていない？効果がない？</h2>
-			<p>標準関数は <span class="key">OPCODE の量がそもそも少ない</span></p>
-			<p class="small" style="margin-top:.6em">標準関数の OPCODE</p>
+			<h2>JIT がむしろ逆効果？</h2>
+			<p>isset()ではむしろ逆効果。なぜか？</p>
+			<table class="compare-table">
+				<thead><tr><th>処理</th><th>アーキ</th><th>OFF</th><th>ON</th><th>ON 比</th></tr></thead>
+				<tbody>
+					<tr><td>isset</td><td>ARM64</td><td>0.022μs</td><td style="color:#c00;font-weight:700;">0.079μs</td><td>約 150 倍速</td></tr>
+					<tr class="highlight"><td>isset</td><td>x86_64</td><td>0.029μs</td><td style="color:#c00;font-weight:700;">0.083μs</td><td>約 150 倍速</td></tr>
+				</tbody>
+			</table>
+		</section>	
+		<section>
+			<p>標準関数は OPCODE の量がそもそも少なく、<br>キャッシュのコスト > JIT の恩恵</p>
 			<pre style="font-size:.5em"><code data-trim data-noescape class="language-c">
 INIT_FCALL   3  "in_array"
 SEND_VAR     !needle
@@ -328,88 +346,13 @@ DO_ICALL
 			</code></pre>
 			<p style="margin-top:.5em">OPCODE は 5 行のみ。<br>標準関数はおおよそこんなかんじ</p>
 		</section>
-
 		<section>
-			<p>呼び出しまでのフロー</p>
-			<div style="display:flex;flex-direction:column;align-items:center;gap:.6em;margin-top:.6em">
-				<!-- PHP コード -->
-				<div style="padding:.5em 1.2em;width:72%">
-					<p style="font-weight:700;font-size:.65em">PHP コード</p>
-					<pre style="margin:.2em 0 0 0;font-size:.55em"><code data-trim data-noescape class="language-php">in_array($needle, $values, true);</code></pre>
-				</div>
-				<p style="margin:0;color:#134aa9;font-size:.55em">↓ </p>
-				<!-- OPCODE -->
-				<div style="padding:.5em 1.2em;width:72%">
-					<p style="font-weight:700;font-size:.65em">OPCODE（JIT/OPcache の対象）</p>
-					<pre style="margin:.2em 0 0 0;font-size:.55em"><code data-trim data-noescape class="language-c">DO_ICALL   in_array</code></pre>
-				</div>
-				<p style="margin:0;color:#134aa9;font-size:.55em">↓</p>
-				<!-- C 側マクロ -->
-				<div style="padding:.5em 1.2em;width:72%">
-					<p style="font-weight:700;font-size:.65em">C 側マクロ（JIT/OPcache の対象外）</p>
-					<pre style="margin:.2em 0 0 0;font-size:.5em"><code data-trim data-noescape class="language-c">PHP_FUNCTION(in_array) → zif_in_array()</code></pre>
-				</div>
-			</div>
+			<h2>標準関数だけなら JIT は<br>効くところがほとんどない</h2>
+			<h3>そんな中でも例外的な関数達を紹介</h3>
 		</section>
 
 		<section>
-			<h2>標準関数は JIT は<br>効くところがほとんどない</h2>
-			<p></p>
-		</section>
-
-		<section>
-			<h2>OPCODE が増える JIT が効くケース</h2>
-			<p class="small">手続きで書いたループコード</p>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
-foreach ($values as $v) {
-    if ($v === $needle) return true;
-}
-return false;
-			</code></pre>
-			<p class="small" style="margin-top:.5em">生成される OPCODE（ループ本体）</p>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-c">
-FE_FETCH_R   $values, $v
-IS_IDENTICAL $v, $needle
-JMPZ         skip
-RETURN       true
-JMP          loop
-			</code></pre>
-			<p style="margin-top:.5em"><span class="key">毎反復 × 10,000 = 数万 OPCODE</span> ＝ JIT 化される対象が桁違いに多い</p>
-		</section>
-
-
-
-		<section>
-			<h2>3-1. ケース①：四則演算 / bcmath</h2>
-			<p class="small" style="margin-top:.4em">ネイティブ float（演算は <code>ADD</code> / <code>MUL</code> OPCODE）</p>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
-$sum = 0.0;
-for ($i = 1; $i <= 1000; $i++) {
-    $sum += $i * 1.5;
-}
-			</code></pre>
-			<p class="small" style="margin-top:.6em">bcmath（C 実装の内部関数）</p>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
-$sum = '0';
-for ($i = 1; $i <= 1000; $i++) {
-    $sum = bcadd($sum, bcmul((string)$i, '1.5', 10), 10);
-}
-			</code></pre>
-		</section>
-
-		<section>
-			<h2>計測結果：ネイティブ float vs bcmath</h2>
-			<table class="compare-table">
-				<thead><tr><th>処理</th><th>JIT ON</th><th>JIT OFF</th><th>JIT 効果</th></tr></thead>
-				<tbody>
-					<tr class="highlight"><td>ネイティブ <code>*</code> <code>+</code>（float）</td><td>1.253μs</td><td>4.562μs</td><td><span class="key">約 3.6 倍速</span></td></tr>
-					<tr><td>bcmath（<code>bcmul</code> / <code>bcadd</code>）</td><td>260.5μs</td><td>274.4μs</td><td>ほぼ差なし</td></tr>
-				</tbody>
-			</table>
-		</section>
-
-		<section>
-			<h2>3-2. ケース②：コールバックを取る標準関数</h2>
+			<h2>ケース１：コールバックを取る標準関数</h2>
 			<p class="small" style="margin-top:.5em">array_map（コールバックは userland）</p>
 			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
 array_map(
