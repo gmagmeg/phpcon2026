@@ -314,12 +314,10 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			<h2>計測結果：in_array vs isset</h2>
 			
 			<table class="compare-table">
-				<thead><tr><th>処理</th><th>アーキ</th><th>OFF</th><th>ON</th><th>ON 比</th></tr></thead>
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th><th>対 in_array</th></tr></thead>
 				<tbody>
-					<tr><td>in_array</td><td>ARM64</td><td>11.88μs</td><td>11.75μs</td><td>ー</td></tr>
-					<tr class="highlight"><td>in_array</td><td>x86_64</td><td>12.70μs</td><td>12.84μs</td><td>ー</td></tr>
-					<tr><td>isset</td><td>ARM64</td><td>0.022μs</td><td style="color:#c00;font-weight:700;">0.079μs</td><td>約 150 倍速</td></tr>
-					<tr class="highlight"><td>isset</td><td>x86_64</td><td>0.029μs</td><td style="color:#c00;font-weight:700;">0.083μs</td><td>約 150 倍速</td></tr>
+					<tr><td>in_array</td><td>12.70μs</td><td>12.78μs</td><td>12.84μs</td><td>基準</td></tr>
+					<tr><td>isset</td><td>0.029μs</td><td style="color:#c00;font-weight:700;">0.081μs</td><td style="color:#c00;font-weight:700;">0.083μs</td><td>約 150 倍速</td></tr>
 				</tbody>
 			</table>
 		</section>
@@ -365,10 +363,10 @@ array_map(
 		<section>
 			<h2>計測結果</h2>
 			<table class="compare-table">
-				<thead><tr><th>処理</th><th>JIT ON</th><th>JIT OFF</th><th>JIT 効果</th></tr></thead>
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
 				<tbody>
-					<tr><td>array_map</td><td>131.7μs</td><td>156.4μs</td><td>約 1.19 倍速</td></tr>
-					<tr><td>usort</td><td>2.501ms</td><td>2.854ms</td><td>約 1.14 倍速</td></tr>
+					<tr><td>array_map</td><td>156.5μs</td><td style="color:#134aa9;font-weight:700;">135.1μs</td><td style="color:#c00;font-weight:700;">138.6μs</td></tr>
+					<tr><td>usort</td><td>2.845ms</td><td style="color:#134aa9;font-weight:700;">2.484ms</td><td style="color:#c00;font-weight:700;">2.482ms</td></tr>
 				</tbody>
 			</table>
 			<p>コールバック部分は標準関数ではないので、JIT の効果が出る</p>
@@ -376,23 +374,26 @@ array_map(
 
 		<section>
 			<h2>3-3. ケース③：もう一つの JIT ＝ PCRE JIT</h2>
-			<p class="small">同じパターンで preg_match を 2,000 回</p>
+			<p class="small">同じパターンで preg_match を 2,000 回・時間を計測</p>
 			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
 $pattern = '/(\w+)@(\w+)\.(com|net|org|co\.jp)|(\d{4})-(\d{2})-(\d{2})/';
+$strings = [/* 2,000 件の文字列 */];
 
+$start = hrtime(true);
 foreach ($strings as $s) {
     preg_match($pattern, $s, $m);
 }
+printf("%.1f μs\n", (hrtime(true) - $start) / 1000);
 			</code></pre>
 		</section>
 
 		<section>
 			<h2>計測結果：PCRE JIT</h2>
 			<table class="compare-table">
-				<thead><tr><th>処理</th><th>pcre.jit ON<br>（既定）</th><th>pcre.jit OFF</th><th>opcache.jit OFF</th></tr></thead>
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
 				<tbody>
-					<tr class="highlight"><td>preg_match ×2000</td><td>511μs</td><td><span class="key">4.44ms</span></td><td>510μs</td></tr>
-					<tr><td>preg_match_all ×2000</td><td>1.19ms</td><td><span class="key">7.85ms</span></td><td>1.21ms</td></tr>
+					<tr><td>preg_match ×2000</td><td>513μs</td><td>503μs</td><td>500μs</td></tr>
+					<tr><td>preg_match_all ×2000</td><td>1.20ms</td><td>1.16ms</td><td>1.18ms</td></tr>
 				</tbody>
 			</table>
 		</section>
