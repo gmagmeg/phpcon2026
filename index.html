@@ -390,12 +390,20 @@ printf("%.1f μs\n", (hrtime(true) - $start) / 1000);
 		<section>
 			<h2>計測結果：PCRE JIT</h2>
 			<table class="compare-table">
-				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th><th>pcre.jit OFF</th></tr></thead>
 				<tbody>
-					<tr><td>preg_match ×2000</td><td>501μs</td><td>483μs</td><td>483μs</td></tr>
-					<tr><td>preg_match_all ×2000</td><td>1.16ms</td><td>1.12ms</td><td>1.13ms</td></tr>
+					<tr><td>preg_match ×2000</td><td>501μs</td><td style="color:#134aa9;font-weight:700;">483μs</td><td style="color:#c00;font-weight:700;">483μs</td><td><span class="key">4.44ms</span></td></tr>
+					<tr><td>preg_match_all ×2000</td><td>1.16ms</td><td style="color:#134aa9;font-weight:700;">1.12ms</td><td style="color:#c00;font-weight:700;">1.13ms</td><td><span class="key">7.85ms</span></td></tr>
 				</tbody>
 			</table>
+		</section>
+
+		<section>
+			<h2>計測結果の読み方</h2>
+			<ul class="emph-middle-list">
+				<li>JIT OFF / function / tracing はいずれも <code>pcre.jit</code> ON<br>→ opcache JIT モード差は <span class="key">数%止まり</span></li>
+				<li><span class="key">pcre.jit</span> を切ると <span class="key">約 8 倍遅い</span><br>→ 効いているのは opcache ではなく <span class="key">PCRE 独自の JIT</span></li>
+			</ul>
 		</section>
 
 		<section class="lead-bridge">
@@ -490,8 +498,9 @@ for ($i = 0; $i < 1000; $i++) {
 			<table class="compare-table">
 				<thead><tr><th>水準</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
 				<tbody>
-					<tr class="highlight"><td>A: Scalar</td><td>5.69μs</td><td>0.79μs</td><td><span class="key">0.80μs</span></td><td><span class="key">約 7.1 倍速</span></td></tr>
-					<tr><td>B: 型付き</td><td>231.7μs</td><td>168.5μs</td><td>167.8μs</td><td>約 1.4 倍速</td></tr>
+					<tr class="highlight"><td>手続き</td><td>5.69μs</td><td>0.79μs</td><td><span class="key">0.80μs</span></td><td><span class="key">約 7.1 倍速</span></td></tr>
+					<tr><td>ミュータブル</td><td>—</td><td>—</td><td>—</td><td>（要計測）</td></tr>
+					<tr><td>イミュータブル</td><td>231.7μs</td><td>168.5μs</td><td>167.8μs</td><td>約 1.4 倍速</td></tr>
 				</tbody>
 			</table>
 		</section>
