@@ -494,13 +494,13 @@ for ($i = 0; $i < 1000; $i++) {
 		</section>
 
 		<section>
-			<p class="small">計測結果：プロパティを毎反復読んで加算する</p>
+			<p class="small">計測結果：オブジェクト生成をループ外へ出せるか（new の位置に注目）</p>
 			<table class="compare-table">
 				<thead><tr><th>水準</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
 				<tbody>
-					<tr class="highlight"><td>手続き</td><td>5.69μs</td><td>0.79μs</td><td><span class="key">0.80μs</span></td><td><span class="key">約 7.1 倍速</span></td></tr>
-					<tr><td>ミュータブル</td><td>—</td><td>—</td><td>—</td><td>（要計測）</td></tr>
-					<tr><td>イミュータブル</td><td>231.7μs</td><td>168.5μs</td><td>167.8μs</td><td>約 1.4 倍速</td></tr>
+					<tr class="highlight"><td>手続き</td><td>6.56μs</td><td>0.87μs</td><td><span class="key">0.88μs</span></td><td><span class="key">約 7.5 倍速</span></td></tr>
+					<tr><td>ミュータブル</td><td>119.0μs</td><td>60.5μs</td><td>60.8μs</td><td>約 2.0 倍速</td></tr>
+					<tr><td>イミュータブル</td><td>255.7μs</td><td>179.6μs</td><td>183.0μs</td><td>約 1.4 倍速</td></tr>
 				</tbody>
 			</table>
 		</section>
