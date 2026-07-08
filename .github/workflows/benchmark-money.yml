@@ -1,0 +1,68 @@
+name: Benchmark Money (手続き / ミュータブル / イミュータブル)
+
+# 値オブジェクト演算の「new の位置」比較（本トークの核）だけを回す専用ワークフロー。
+# 対象は MoneyBench.php の 3 subject のみ:
+#   benchScalar         … 手続き（生スカラー。到達できる速度の上限の目安）
+#   benchMutableMoney   … ミュータブル（new はループ外で 1 度・中は破壊的更新）
+#   benchImmutableMoney … イミュータブル（add / multiply が毎回 new）
+#
+# 迷いをなくすため入力なし・対象ハードコード。JIT OFF / function / tracing の 3 モードを
+# ネイティブ x86_64（GitHub-hosted ubuntu）で計測し、スライドに貼れる形で Step Summary に出す。
+# 使い方: Actions タブ → このワークフロー → Run workflow。
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: benchmark-money-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    name: money
+    runs-on: ubuntu-latest        # GitHub-hosted ランナーはネイティブ x86_64
+    defaults:
+      run:
+        working-directory: laravel  # compose.yaml / Dockerfile はここ
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CPU / arch info
+        run: |
+          echo "arch: $(uname -m)"
+          lscpu | grep -E 'Architecture|Model name|^CPU\(s\)|MHz' || true
+
+      - name: Build app image (native amd64)
+        run: docker compose build app
+
+      - name: Run MoneyBench (JIT OFF / function / tracing)
+        env:
+          IMG: performance-php-app          # compose がビルドするイメージ名
+          BENCH: benchmarks/MoneyBench.php
+        run: |
+          set -euo pipefail
+
+          # イメージには .env を焼き込んでいない（.dockerignore 済み）ため、
+          # エントリポイントが起動時に .env を生成＆composer は焼き込み済み。
+          # volume はマウントしない（マウントすると CI 上に vendor が無く壊れる）。
+          run_mode () {   # $1=label  $2..=phpbench の追加フラグ
+            local label="$1"; shift
+            echo "-- JIT ${label} --" | tee -a "$GITHUB_STEP_SUMMARY"
+            docker run --rm "$IMG" \
+              php vendor/bin/phpbench run "$BENCH" --report=aggregate --time-unit=microseconds "$@" 2>&1 \
+              | grep -E '^\| ' | tee -a "$GITHUB_STEP_SUMMARY" || true
+          }
+
+          {
+            echo "## MoneyBench — native amd64 ($(uname -m))"
+            echo ""
+            echo "CPU: \`$(lscpu | awk -F: '/Model name/{print $2; exit}' | xargs)\`"
+            echo ""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          run_mode "OFF"      --php-config='opcache.jit_buffer_size: 0'
+          run_mode "function" --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: function'
+          run_mode "tracing"  --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: tracing'
+
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
