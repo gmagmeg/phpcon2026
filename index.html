@@ -29,23 +29,27 @@
 
 		<!-- ===== 一行テーマ ===== -->
 		<section class="center-punch">
-			<p>OPcache と JIT がどこに効くのかを 計測して確認する</p>
+			<p>OPcache と JIT がどこに効くのかを計測し、<br>「効く / 効かない」を予測できるようになる</p>
 		</section>
 
 		<!-- ============================================================ -->
-		<!-- 第1章 イントロ / 前提合わせ -->
+		<!-- イントロ / 前提合わせ -->
 		<!-- ============================================================ -->
 		<section class="goal-slide">
 			<h2>このセッションのゴール</h2>
 			OPcache、JIT が
 			<ul class="emph-middle-list">
 						<li>それぞれどこに効くのかを<br>計測して<br>数字で見て<br>理解する</li>
+						<li>効く / 効かないを<br>計測の前に<br>予測できるようになる</li>
 						<li>導入したけれど<br>早くならない<br>早くなったかわからない<br>をなくす</li>
 					</ul>
 		</section>
 
-		<section class="subsection-divider">
-			<h2>OPcache の計測実施と結果</h2>
+		<!-- ============================================================ -->
+		<!-- 第1章 OPcache の効果計測 -->
+		<!-- ============================================================ -->
+		<section class="section-divider">
+			<h1>1. OPcache の効果計測</h1>
 		</section>
 
 		<section>
@@ -147,20 +151,13 @@
 			</table>
 		</section>
 
-		<!-- ============================================================ -->
-		<!-- OPcache の効果計測 -->
-		<!-- ============================================================ -->
-		<section class="section-divider">
-			<h1>OPcache の効果計測</h1>
-		</section>
-
 		<section>
-			<p>効果量はコード量（コンパイル対象の規模）にほぼ比例</span>する。</p>
+			<p>効果量は<span class="key">コード量（コンパイル対象の規模）</span>にほぼ比例する。</p>
 			<div class="checklist">
 				<p class=""><span class="ok mark" style="font-size:1.5em;">↑</span><span class="ok" style="font-weight: bold; font-size:1.5em;">大量のクラス/ファイル</span><br>コンパイルコストが積み上がるため、効果も大きい</p>
 				<p class=""><span class="ng mark" style="font-size:1.5em;">↓</span><span class="ng" style="font-weight: bold; font-size:1.5em;">薄いスクリプト群</span><br>
 					コンパイルコストが元々小さく、効果も薄い</p>
-				
+
 			</div>
 		</section>
 
@@ -240,16 +237,16 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 		</section>
 
 		<!-- ============================================================ -->
-		<!-- 第3章 JIT の効果計測 -->
+		<!-- 第2章 JIT の効果計測 ― 意外な結果から原則を見つける -->
 		<!-- ============================================================ -->
 		<section class="section-divider">
-			<h1>3. JIT の効果計測</h1>
+			<h1>2. JIT の効果計測<br>― 意外な結果から</h1>
 		</section>
 
 		<section>
 			<h2>JIT の概要</h2>
 			<ul class="emph-middle-list">
-				<li>OPecache 前提で、キャッシュした <span class="key">OPCODE をネイティブ機械語</span>に変換して実行</li>
+				<li>OPcache 前提で、キャッシュした <span class="key">OPCODE をネイティブ機械語</span>に変換して実行</li>
 				<li>Zend VM を介さず CPU が直接走るため、<span class="key">計算ヘビーな処理</span>ほど効きやすい</li>
 			</ul>
 		</section>
@@ -264,6 +261,7 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 					<tr><td>計測ライブラリ</td><td>PHPBench</td></tr>
 				</tbody>
 			</table>
+			<p class="small" style="color:#b91c1c;font-weight:700">TODO：全計測の基準アーキを x86_64 に統一する（現状 Money / カートの計測は ARM64。x86_64 で再計測し、アーキ差は第3章末の「おまけ」でのみ扱う）</p>
 		</section>
 
 		<section>
@@ -271,10 +269,10 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 			<p>PHP の JIT（DynASM ベース）は、アーキごとにコード生成器が分かれている：</p>
 			<ul class="emph-middle-list">
 				<li><span class="key">x86</span>（32-bit / i386）</li>
-				<li><span class="key">x86_64</span>（64-bit / AMD64）</li>
+				<li><span class="key">x86_64</span>(64-bit / AMD64）</li>
 				<li><span class="key">ARM64</span>（AArch64 / Apple Silicon 等）</li>
 			</ul>
-			<p class="small">ARM64 対応は比較的新しく、同じコードでも速度が異なる。</p>
+			<p class="small">ARM64 対応は比較的新しく、同じコードでも速度が異なる。→ 後ほど実例を紹介</p>
 		</section>
 
 		<section class="center-punch">
@@ -283,9 +281,9 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 				alt="JIT が効くところ：OPcache 上の OPCODE を JIT が機械語化し、Zend VM を介さず CPU が直接機械語を実行する">
 		</section>
 
-		<!-- 前提：in_array vs isset（問い → 結果 → 結論 の3枚） -->
+		<!-- つかみ：in_array vs isset（問い → 結果 → 意外な結果 → 種明かし） -->
 		<section>
-			<h2>JIT で isset と in_arary() 速度差は縮まるのか</h2>
+			<h2>JIT で isset と in_array() の速度差は縮まるのか</h2>
 			<p><code>in_array</code>：先頭から走査する<span class="key">線形探索 O(n)</span></p>
 
 			<p><code>isset</code>：キー有無を引く<span class="key">ハッシュ参照 O(1)</span>
@@ -295,7 +293,7 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 
 		<section>
 			<h2>計測コード</h2>
-			
+
 			<pre style="font-size:.52em"><code data-trim data-noescape class="language-php">
 				// in_array：値の中から探す（得意：値検索）
 				$values = range(1, 10000);
@@ -312,7 +310,7 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 
 		<section>
 			<h2>計測結果：in_array vs isset</h2>
-			
+
 			<table class="compare-table">
 				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th><th>対 in_array</th></tr></thead>
 				<tbody>
@@ -328,11 +326,11 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			<table class="compare-table">
 				<thead><tr><th>処理</th><th>アーキ</th><th>OFF</th><th>ON</th><th>ON 比</th></tr></thead>
 				<tbody>
-					<tr><td>isset</td><td>ARM64</td><td>0.022μs</td><td style="color:#c00;font-weight:700;">0.079μs</td><td>約 150 倍速</td></tr>
-					<tr class="highlight"><td>isset</td><td>x86_64</td><td>0.029μs</td><td style="color:#c00;font-weight:700;">0.083μs</td><td>約 150 倍速</td></tr>
+					<tr><td>isset</td><td>ARM64</td><td>0.022μs</td><td style="color:#c00;font-weight:700;">0.079μs</td><td style="color:#c00;font-weight:700;">約 3.6 倍遅い</td></tr>
+					<tr class="highlight"><td>isset</td><td>x86_64</td><td>0.029μs</td><td style="color:#c00;font-weight:700;">0.083μs</td><td style="color:#c00;font-weight:700;">約 2.9 倍遅い</td></tr>
 				</tbody>
 			</table>
-		</section>	
+		</section>
 		<section>
 			<p>標準関数は OPCODE の量がそもそも少なく、<br>キャッシュのコスト > JIT の恩恵</p>
 			<pre style="font-size:.5em"><code data-trim data-noescape class="language-c">
@@ -342,16 +340,22 @@ SEND_VAR     !values
 SEND_VAL     true
 DO_ICALL
 			</code></pre>
-			<p style="margin-top:.5em">OPCODE は 5 行のみ。<br>標準関数はおおよそこんなかんじ</p>
+			<p style="margin-top:.5em">OPCODE は 5 行のみ。<br>本体の探索処理は C で書かれた内部実装が行う</p>
 		</section>
-		<section>
-			<h2>標準関数だけなら JIT は<br>効くところがほとんどない</h2>
-			<h3>そんな中でも例外的な関数達を紹介</h3>
+
+		<!-- ===== 原則の宣言（このセッションの核） ===== -->
+		<section class="center-punch">
+			<p><span class="key">JIT が速くするのは OPCODE の実行だけ</span><br>C の世界（内部関数・オブジェクト生成・PCRE）には届かない</p>
+			<p class="small" style="color:#b91c1c;font-weight:700">TODO：処理時間の内訳を「VM 側（JIT が届く）/ C 側（届かない）」で塗り分けた図を追加する（jit-flow.svg を拡張し、内部関数・new・正規表現エンジンを C 側として配置する）</p>
+		</section>
+
+		<section class="lead-bridge">
+			<p>この原則を使えば、計測の<span class="key">前に</span>結果を予測できるはず。<br>ここからは「<span class="key">予測 → 計測 → 答え合わせ</span>」で確かめていく。</p>
 		</section>
 
 		<section>
-			<h2>ケース１：コールバックを取る標準関数</h2>
-			<p class="small" style="margin-top:.5em">array_map（コールバックは userland）</p>
+			<h2>ケース①：コールバックを取る標準関数</h2>
+			<p>予測：<code>array_map</code> 自体は C だが、<span class="key">コールバックは userland の OPCODE</span> → その部分にだけ効くはず</p>
 			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
 array_map(
     static fn (int $n): float => $n * 1.5 + $n - ($n / 3.0),
@@ -369,11 +373,12 @@ array_map(
 					<tr><td>usort</td><td>2.845ms</td><td style="color:#134aa9;font-weight:700;">2.484ms</td><td style="color:#c00;font-weight:700;">2.482ms</td></tr>
 				</tbody>
 			</table>
-			<p>コールバック部分は標準関数ではないので、JIT の効果が出る</p>
+			<p>予測どおり：コールバック部分（userland）の分だけ効果が出る</p>
 		</section>
 
 		<section>
-			<h2>3-3. ケース③：もう一つの JIT ＝ PCRE JIT</h2>
+			<h2>ケース②：preg_match ― 正規表現エンジンは C 側</h2>
+			<p>予測：正規表現の照合は C（PCRE）の仕事 → JIT は効かないはず</p>
 			<p class="small">同じパターンで preg_match を 2,000 回・時間を計測</p>
 			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
 $pattern = '/(\w+)@(\w+)\.(com|net|org|co\.jp)|(\d{4})-(\d{2})-(\d{2})/';
@@ -401,23 +406,29 @@ printf("%.1f μs\n", (hrtime(true) - $start) / 1000);
 		<section>
 			<h2>計測結果の読み方</h2>
 			<ul class="emph-middle-list">
-				<li>JIT OFF / function / tracing はいずれも <code>pcre.jit</code> ON<br>→ opcache JIT モード差は <span class="key">数%止まり</span></li>
-				<li><span class="key">pcre.jit</span> を切ると <span class="key">約 8 倍遅い</span><br>→ 効いているのは opcache ではなく <span class="key">PCRE 独自の JIT</span></li>
+				<li>JIT OFF / function / tracing はいずれも <code>pcre.jit</code> ON<br>→ opcache JIT モード差は <span class="key">数%止まり</span>（予測どおり）</li>
+				<li><span class="key">pcre.jit</span> を切ると <span class="key">約 8 倍遅い</span><br>→ 効いていたのは opcache ではなく <span class="key">PCRE 独自の JIT</span>。C の世界には C の世界の JIT がいた</li>
 			</ul>
 		</section>
 
 		<section class="lead-bridge">
-			<p>標準関数は JIT が効かないケースがほとんど<br>効果が出るケースの方が少ない</p>
+			<p>標準関数が支配的な処理では、JIT の効き幅は薄い。<br>逆に言えば ―― <span class="key">時間を OPCODE 側に寄せれば、効かせられる</span>。</p>
 		</section>
 
-		<!-- 4-4 実践（核） -->
-		<section class="lead-bridge">
-			<p>標準関数を使った手続的な処理には効果が薄い<br>
-				そんなに積極的に入れなくてもいいのかも。。。？
-			</p>
+		<!-- ============================================================ -->
+		<!-- 第3章 実践編 ― 時間の在処を OPCODE 側に寄せる -->
+		<!-- ============================================================ -->
+		<section class="section-divider">
+			<h1>3. 実践編<br>― 時間の在処を OPCODE 側に寄せる</h1>
 		</section>
+
 		<section>
-			<h2>実はオブジェクト指向・DDD には恩恵が大きい</h2>
+			<h2>型が安定した「計算」には効く</h2>
+			<ul class="emph-middle-list">
+				<li>型付きのドメインロジック＝<span class="key">OPCODE 中心の計算</span> → JIT の得意分野</li>
+				<li>ただし<span class="key">オブジェクト生成（new）は C 側の alloc</span> → そこには届かない</li>
+			</ul>
+			<p style="text-align:center"><span class="key emph-1_2x">「クラスで包んだ計算」に効く</span><br>のであって「クラスだから効く」ではない</p>
 		</section>
 
 		<section>
@@ -457,7 +468,7 @@ final class Money
     { return new self($this->amount * $f); }
 }
 			</code></pre>
-			
+
 		</section>
 
 		<section>
@@ -503,6 +514,181 @@ for ($i = 0; $i < 1000; $i++) {
 					<tr><td>イミュータブル</td><td>235.6μs</td><td>162.8μs</td><td>161.5μs</td><td>約 1.5 倍速</td></tr>
 				</tbody>
 			</table>
+			<p class="small">手続き（ほぼ全部 OPCODE）は 7.3 倍、イミュータブル（毎回 new ＝ C 側 alloc）は 1.5 倍止まり ― <span class="key">原則どおり、new の数が効き幅を決める</span></p>
+		</section>
+
+		<section>
+			<h2>JIT を効かせても生成コストは残る</h2>
+			<div style="display:flex;align-items:center;justify-content:center;gap:.7em;margin:.6em 0;">
+				<div style="text-align:center;">
+					<div>イミュータブル<br>JIT tracing</div>
+					<div style="font-size:3em;font-weight:800;color:#b91c1c;line-height:1.1;">1,087<span style="font-size:.4em;">ms</span></div>
+				</div>
+				<div style="font-size:3em;font-weight:800;color:#5b6b80;">&gt;</div>
+				<div style="text-align:center;">
+					<div>ミュータブル<br>JIT なし</div>
+					<div style="font-size:3em;font-weight:800;color:#15803d;line-height:1.1;">806<span style="font-size:.4em;">μs</span></div>
+				</div>
+			</div>
+			<p class="small" style="color:#b91c1c;font-weight:700">TODO：単位と計測条件を確認する（Money 計測表は μs オーダーなのに、ここは ms / μs が混在して 3 桁ずれている。別条件（反復数の違い等）なら条件を明記、誤記なら修正する）</p>
+		</section>
+
+		<section>
+			<h2>題材：クーポン割引・送料計算</h2>
+			<p class="small">EC のカート確定処理を、2 実装（連想配列版 / 型付き VO 版）で計測する</p>
+			<ul class="scenario-steps">
+				<li>
+					<span class="step-no">1</span>
+					<p><strong>小計</strong> カート明細（単価 × 数量）を合計する</p>
+				</li>
+				<li>
+					<span class="step-no">2</span>
+					<p><strong>割引</strong> 適用クーポンで割引額を算出する（定額 / 率 / 条件付き）</p>
+				</li>
+				<li>
+					<span class="step-no">3</span>
+					<p><strong>送料</strong> 配送地域 × 重量から送料を算出する（無料ライン判定あり）</p>
+				</li>
+				<li>
+					<span class="step-no">4</span>
+					<p><strong>確定</strong> 小計 − 割引 ＋ 送料 で請求額を確定する</p>
+				</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>実装：クーポンはポリモーフィズム</h2>
+			<pre style="font-size:.36em; margin:.2em 0;"><code data-trim data-noescape class="language-php">
+interface Coupon { public function discountFor(Money $subtotal): Money; }
+final class FixedCoupon     implements Coupon { /* 小計を超えない定額   */ }
+final class RateCoupon      implements Coupon { /* 小計の N%           */ }
+final class ThresholdCoupon implements Coupon { /* 閾値以上で固定額     */ }
+
+// 型付き VO 版：小計 → 割引 → 送料 → 確定
+$subtotal = Money::zero();
+foreach ($cart-&gt;lines as $line) $subtotal = $subtotal-&gt;add($line-&gt;subtotal());
+$discount   = $cart-&gt;coupon-&gt;discountFor($subtotal);   // ← 多態 dispatch
+$discounted = $subtotal-&gt;subtract($discount);
+$shipping   = $policy-&gt;feeFor($discounted, $region, $weight);  // 地域×重量
+$total      = $discounted-&gt;add($shipping);
+			</code></pre>
+			<p class="small">配列版は同じルールを <code>switch ($spec['type'])</code> の手続き分岐で実装（<code>CartCheckoutArrayBench</code>）。VO 版は上記クラス群（<code>CartCheckoutTypedBench</code>）。5,000 カート × 4 明細、両版で結果一致を検証済み。</p>
+		</section>
+
+		<section>
+			<h2>計測結果：alloc を削ると JIT が効く</h2>
+			<table class="compare-table">
+				<thead><tr><th>実装</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
+				<tbody>
+					<tr><td>配列</td><td>1.60ms</td><td>1.03ms</td><td>0.94ms</td><td><span class="key">約 1.70 倍速</span></td></tr>
+					<tr><td>VO</td><td>8.96ms</td><td>7.44ms</td><td>6.53ms</td><td><span class="key">約 1.37 倍速</span></td></tr>
+					<tr class="highlight"><td>VO（低alloc）</td><td>2.92ms</td><td>1.95ms</td><td>1.43ms</td><td><span class="key">約 2.04 倍速</span></td></tr>
+				</tbody>
+			</table>
+			<p class="small">配列 = 連想配列版 / VO = 型付き VO 版 / 低alloc = ループ内 new を排した VO（PHP 8.5.7 / ARM64・100 revs × 5 it）</p>
+			<p>VO の重さは <strong>Money 生成（C 側 alloc）</strong>。ループ内の new を削ると <strong>JIT の効き幅が 1.37× → 2.04× に化け</strong>、tracing で配列に迫る。</p>
+		</section>
+
+		<section>
+			<h2>効き幅の差：バイトコード vs C 側</h2>
+			<ul style="display:block; box-sizing:border-box;">
+				<li>配列版は <strong>int 演算＋配列アクセス</strong>主体 → JIT がバイトコードを特殊化 → <span class="key">約 1.70 倍速</span></li>
+				<li>VO 版は <strong><code>new Money()</code> のオブジェクト生成（C 側 alloc）</strong>が残る → JIT が届かず効きは薄い（<span class="key">約 1.37 倍</span>）</li>
+				<li>多態 <code>discountFor()</code> も 3 型混在で virtual call が残りインライン化されにくい</li>
+				<li>参考：<strong>純粋な整数ループ</strong>なら tracing で <span class="key">約 9 倍速</span>（JIT が最も効く形）</li>
+				<li>結論：<strong>JIT はバイトコードを速くする</strong>。VO の生成コストは C 側に残り、<span class="key">効き幅も絶対値も差が残る</span>（datetime／Carbon と同じ構図）</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>単一実装 vs ポリモーフィズム</h2>
+			<p class="small">同じ計算処理を、interface有り無しで比較する</p>
+			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
+interface TransferRiskScorer {
+    public function score(TransferRequest $request, int $iteration): int;
+}
+
+$score += $concrete->score($request, $i);      // 直接 concrete
+$score += $mono->score($request, $i);          // 単一 interface
+$score += $polys[$i % 3]->score($request, $i); // 多態 dispatch
+			</code></pre>
+			<ul class="emph-middle-list small">
+				<li><code>concrete</code> = 直呼び</li>
+				<li><code>mono</code> = interface 1 種</li>
+				<li><code>polys</code> = interface 3 種切替</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>計測結果</h2>
+			<table class="compare-table small">
+				<thead><tr><th>呼び方</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+				<tbody>
+					<tr><td>concrete 直呼び</td><td>4.069ms</td><td>2.732ms</td><td>1.836ms</td></tr>
+					<tr><td>単一 interface</td><td>3.930ms</td><td>2.648ms</td><td>1.790ms</td></tr>
+					<tr class="highlight"><td>複数実装 interface</td><td>4.160ms</td><td>2.703ms</td><td>1.988ms</td></tr>
+				</tbody>
+			</table>
+			<p>わりと横並びの結果に。<br>JIT 導入時はポリモーフィズムの有無で、そこまで気にしなくて良さそう</p>
+		</section>
+
+		<section>
+			<h2>値オブジェクトの等価判定：getter 直比較 vs <code>equal()</code></h2>
+			<pre style="font-size:.4em"><code data-trim data-noescape class="language-php">
+// 型付き VO（Money = readonly int）
+$priceA = new Money(12345);
+$priceB = new Money(12345); // 同額・別インスタンス
+
+// 同じ等価判定を 2 通りで書く
+$priceA->amount() === $priceB->amount(); // D1 getter 直比較
+$priceA->equal($priceB);                 // D2 equal() メソッド
+
+// Money::equal() の中身は int 同士の ===
+public function equal(Money $o): bool {
+    return $this->amount === $o->amount;
+}
+			</code></pre>
+		</section>
+
+		<section>
+			<h2>計測結果</h2>
+			<table class="compare-table small">
+				<thead><tr><th>水準</th><th>比較</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+				<tbody>
+					<tr><td>D1</td><td>getter 直比較 <code>===</code></td><td>54ns</td><td>27ns</td><td>26ns</td></tr>
+					<tr class="highlight"><td>D2</td><td><code>equal()</code> メソッド</td><td>43ns</td><td>28ns</td><td>27ns</td></tr>
+				</tbody>
+			</table>
+		</section>
+		<section>
+			<p class="small">JIT ありならそれほど大きな差は出ず。
+				<br>面白いのはgetter()同士の比較よりも引数渡しの方が早かったこと
+				<br>getter()を２呼ぶ回数分、コストはかかる
+			</p>
+		</section>
+
+		<section>
+			<h2>値オブジェクトの等価判定：総括</h2>
+			<ul class="emph-middle-list">
+				<li>getter 直比較も <code>equal()</code> メソッドも、JIT 後は <span class="key">同じ ~26ns に潰れる</span>（同じ命令に特殊化）</li>
+				<li>型付き VO 同士なら <code>equal()</code> の呼び出しを <strong>JIT がインライン化</strong> ＝ カプセル化のコストはゼロ</li>
+				<li>JIT が無くても <code>equal()</code> は不利にならない（getter 2 回より呼び出し 1 回が安い）</li>
+			</ul>
+			<p style="text-align:center">「速いから getter を晒す」のではなく<br><span class="key emph-1_2x">「VO に <code>equal()</code> を持たせる」設計を選んでよい</span></p>
+		</section>
+
+		<section>
+			<h2>実践編のまとめ</h2>
+			<ul class="emph-middle-list">
+				<li>型付きの計算ロジックには効く。効き幅を決めるのは<span class="key">ループ内の new の数</span>（C 側 alloc）</li>
+				<li>ポリモーフィズム・<code>equal()</code> のコストは JIT 後ほぼゼロ → <span class="key">設計を速度のために曲げる必要はない</span></li>
+				<li>メソッドの中身が標準関数や IO の寄せ集めだと効かない（中身は C で JIT 対象外）</li>
+			</ul>
+		</section>
+
+		<!-- ===== おまけ：アーキで結果が変わる ===== -->
+		<section class="subsection-divider">
+			<h2>おまけ：アーキで結果が変わる ― 振替要求フロー</h2>
 		</section>
 
 		<section>
@@ -557,7 +743,7 @@ foreach ($rows as $row) {
 		</section>
 
 		<section>
-			<h2>実践例：振替要求フロー（型付き VO 版）</h2>
+			<h2>振替要求フロー（型付き VO 版）</h2>
 			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
 final readonly class TransferRequest
 {
@@ -579,7 +765,7 @@ $statements->applyReceipt($receipt);
 		</section>
 
 		<section>
-			<h2>計測結果</h2>
+			<h2>計測結果：同じコードでもアーキで逆転する</h2>
 			<table class="compare-table">
 				<thead><tr><th>実装</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
 				<tbody>
@@ -588,7 +774,7 @@ $statements->applyReceipt($receipt);
 				</tbody>
 			</table>
 			<p class="small">配列 = 連想配列版 / VO = 型付き VO 版</p>
-			<p>JIT なし：手続きが高速<br>JIT あり：型付き VO が高速</p>
+			<p class="small" style="color:#b91c1c;font-weight:700">TODO：x86_64（GitHub Actions）で再計測して数値を確定する。この VO tracing 3.847ms（約 4.66 倍速）は ARM64 では再現しない（再計測では VO は tracing でも約 14ms のまま＝配列より遅い）。x86_64 の確定値と ARM64 の再計測値（配列 7.42ms→4.97ms / VO 18.16ms→14.16ms）を 2 表で並べ、「JIT はアーキごとに別実装」（第2章の伏線）の実例として回収する構成にする</p>
 			<aside class="notes">
 				計測環境の記録：本スライドの数値は ARM64 環境では再現しない。
 				再計測環境は ARM64（aarch64 / Apple Silicon・Docker, PHP 8.5.7）。
@@ -603,178 +789,11 @@ $statements->applyReceipt($receipt);
 			</aside>
 		</section>
 
-		<section>
-			<h2>次の題材：クーポン割引・送料計算</h2>
-			<p class="small">EC のカート確定処理を、同じ 2 実装（連想配列版 / 型付き VO 版）で計測する</p>
-			<ul class="scenario-steps">
-				<li>
-					<span class="step-no">1</span>
-					<p><strong>小計</strong> カート明細（単価 × 数量）を合計する</p>
-				</li>
-				<li>
-					<span class="step-no">2</span>
-					<p><strong>割引</strong> 適用クーポンで割引額を算出する（定額 / 率 / 条件付き）</p>
-				</li>
-				<li>
-					<span class="step-no">3</span>
-					<p><strong>送料</strong> 配送地域 × 重量から送料を算出する（無料ライン判定あり）</p>
-				</li>
-				<li>
-					<span class="step-no">4</span>
-					<p><strong>確定</strong> 小計 − 割引 ＋ 送料 で請求額を確定する</p>
-				</li>
-			</ul>
-		</section>
-
-		<section>
-			<h2>実装：クーポンはポリモーフィズム</h2>
-			<pre style="font-size:.36em; margin:.2em 0;"><code data-trim data-noescape class="language-php">
-interface Coupon { public function discountFor(Money $subtotal): Money; }
-final class FixedCoupon     implements Coupon { /* 小計を超えない定額   */ }
-final class RateCoupon      implements Coupon { /* 小計の N%           */ }
-final class ThresholdCoupon implements Coupon { /* 閾値以上で固定額     */ }
-
-// 型付き VO 版：小計 → 割引 → 送料 → 確定
-$subtotal = Money::zero();
-foreach ($cart-&gt;lines as $line) $subtotal = $subtotal-&gt;add($line-&gt;subtotal());
-$discount   = $cart-&gt;coupon-&gt;discountFor($subtotal);   // ← 多態 dispatch
-$discounted = $subtotal-&gt;subtract($discount);
-$shipping   = $policy-&gt;feeFor($discounted, $region, $weight);  // 地域×重量
-$total      = $discounted-&gt;add($shipping);
-			</code></pre>
-			<p class="small">配列版は同じルールを <code>switch ($spec['type'])</code> の手続き分岐で実装（<code>CartCheckoutArrayBench</code>）。VO 版は上記クラス群（<code>CartCheckoutTypedBench</code>）。5,000 カート × 4 明細、両版で結果一致を検証済み。</p>
-		</section>
-
-		<section>
-			<h2>計測結果：alloc を削ると JIT が効く</h2>
-			<table class="compare-table">
-				<thead><tr><th>実装</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
-				<tbody>
-					<tr><td>配列</td><td>1.60ms</td><td>1.03ms</td><td>0.94ms</td><td><span class="key">約 1.70 倍速</span></td></tr>
-					<tr><td>VO</td><td>8.96ms</td><td>7.44ms</td><td>6.53ms</td><td><span class="key">約 1.37 倍速</span></td></tr>
-					<tr class="highlight"><td>VO（低alloc）</td><td>2.92ms</td><td>1.95ms</td><td>1.43ms</td><td><span class="key">約 2.04 倍速</span></td></tr>
-				</tbody>
-			</table>
-			<p class="small">配列 = 連想配列版 / VO = 型付き VO 版 / 低alloc = ループ内 new を排した VO（PHP 8.5.7 / ARM64・100 revs × 5 it）</p>
-			<p>VO の重さは <strong>Money 生成（C 側 alloc）</strong>。ループ内の new を削ると <strong>JIT が約 2 倍効き</strong>、tracing で配列に迫る。</p>
-		</section>
-
-		<section>
-			<h2>効き幅の差：バイトコード vs C 側</h2>
-			<ul style="display:block; box-sizing:border-box;">
-				<li>配列版は <strong>int 演算＋配列アクセス</strong>主体 → JIT がバイトコードを特殊化 → <span class="key">約 1.70 倍速</span></li>
-				<li>VO 版は <strong><code>new Money()</code> のオブジェクト生成（C 側 alloc）</strong>が残る → JIT が届かず効きは薄い（<span class="key">約 1.37 倍</span>）</li>
-				<li>多態 <code>discountFor()</code> も 3 型混在で virtual call が残りインライン化されにくい</li>
-				<li>参考：<strong>純粋な整数ループ</strong>なら tracing で <span class="key">約 9 倍速</span>（JIT が最も効く形）</li>
-				<li>結論：<strong>JIT はバイトコードを速くする</strong>。VO の生成コストは C 側に残り、<span class="key">効き幅も絶対値も差が残る</span>（datetime／Carbon と同じ構図）</li>
-			</ul>
-		</section>
-
-		<section>
-			<h2>単一実装 vs ポリモーフィズム</h2>
-			<p class="small">同じ計算処理を、interface有り無しで比較する</p>
-			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
-interface TransferRiskScorer {
-    public function score(TransferRequest $request, int $iteration): int;
-}
-
-$score += $concrete->score($request, $i);      // 直接 concrete
-$score += $mono->score($request, $i);          // 単一 interface
-$score += $polys[$i % 3]->score($request, $i); // 多態 dispatch	
-			</code></pre>
-			<ul class="emph-middle-list small">
-				<li><code>concrete</code> = 直呼び</li>
-				<li><code>mono</code> = interface 1 種</li>
-				<li><code>polys</code> = interface 3 種切替</li>
-			</ul>
-		</section>
-
-		<section>
-			<h2>計測結果</h2>
-			<table class="compare-table small">
-				<thead><tr><th>呼び方</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
-				<tbody>
-					<tr><td>concrete 直呼び</td><td>4.069ms</td><td>2.732ms</td><td>1.836ms</td></tr>
-					<tr><td>単一 interface</td><td>3.930ms</td><td>2.648ms</td><td>1.790ms</td></tr>
-					<tr class="highlight"><td>複数実装 interface</td><td>4.160ms</td><td>2.703ms</td><td>1.988ms</td></tr>
-				</tbody>
-			</table>
-			<p>わりと横並びの結果に。<br>JIT 導入時はポリモーフィズムの有無で、そこまで気にしなくて良さそう</p>
-		</section>
-		<section>
-			<h2>JIT を効かせても生成コストは残る</h2>
-			<div style="display:flex;align-items:center;justify-content:center;gap:.7em;margin:.6em 0;">
-				<div style="text-align:center;">
-					<div>イミュータブル<br>JIT tracing</div>
-					<div style="font-size:3em;font-weight:800;color:#b91c1c;line-height:1.1;">1,087<span style="font-size:.4em;">ms</span></div>
-				</div>
-				<div style="font-size:3em;font-weight:800;color:#5b6b80;">&gt;</div>
-				<div style="text-align:center;">
-					<div>ミュータブル<br>JIT なし</div>
-					<div style="font-size:3em;font-weight:800;color:#15803d;line-height:1.1;">806<span style="font-size:.4em;">μs</span></div>
-				</div>
-			</div>
-		</section>
-
-		<section>
-			<h2>3-4. 値オブジェクトの等価判定：getter 直比較 vs <code>equal()</code></h2>
-			<pre style="font-size:.4em"><code data-trim data-noescape class="language-php">
-// 型付き VO（Money = readonly int）
-$priceA = new Money(12345);
-$priceB = new Money(12345); // 同額・別インスタンス
-
-// 同じ等価判定を 2 通りで書く
-$priceA->amount() === $priceB->amount(); // D1 getter 直比較
-$priceA->equal($priceB);                 // D2 equal() メソッド
-
-// Money::equal() の中身は int 同士の ===
-public function equal(Money $o): bool {
-    return $this->amount === $o->amount;
-}
-			</code></pre>
-		</section>
-
-		<section>
-			<h2>計測結果</h2>
-			<table class="compare-table small">
-				<thead><tr><th>水準</th><th>比較</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
-				<tbody>
-					<tr><td>D1</td><td>getter 直比較 <code>===</code></td><td>54ns</td><td>27ns</td><td>26ns</td></tr>
-					<tr class="highlight"><td>D2</td><td><code>equal()</code> メソッド</td><td>43ns</td><td>28ns</td><td>27ns</td></tr>
-				</tbody>
-			</table>
-		</section>
-		<section>
-			<p class="small">JIT ありならそれほど大きな差は出ず。
-				<br>面白いのはgetter()同士の比較よりも引数渡しの方が早かったこと
-				<br>getter()を２呼ぶ回数分、コストはかかる
-			</p>
-		</section>
-
-		<section>
-			<h2>値オブジェクトの等価判定：総括</h2>
-			<ul class="emph-middle-list">
-				<li>getter 直比較も <code>equal()</code> メソッドも、JIT 後は <span class="key">同じ ~26ns に潰れる</span>（同じ命令に特殊化）</li>
-				<li>型付き VO 同士なら <code>equal()</code> の呼び出しを <strong>JIT がインライン化</strong> ＝ カプセル化のコストはゼロ</li>
-				<li>JIT が無くても <code>equal()</code> は不利にならない（getter 2 回より呼び出し 1 回が安い）</li>
-			</ul>
-			<p style="text-align:center">「速いから getter を晒す」のではなく<br><span class="key emph-1_2x">「VO に <code>equal()</code> を持たせる」設計を選んでよい</span></p>
-		</section>
-
-		<section>
-			<h2>3-4. ドメイン層への接続</h2>
-			<ul class="emph-middle-list">
-				<li>ドメイン層を「型付きの値オブジェクト＋計算」で構成すると、<span class="key">JIT の恩恵を最大化</span></li>
-				<li>逆に、メソッドの中身が標準関数や IO の寄せ集めだと効かない（中身は C で JIT 対象外）</li>
-			</ul>
-			<p style="text-align:center"><span class="key emph-1_2x">「クラスで包んだ計算」に効く</span><br>のであって「クラスだから効く」ではない</p>
-		</section>
-
 		<!-- ============================================================ -->
 		<!-- 第4章 まとめ -->
 		<!-- ============================================================ -->
 		<section class="section-divider">
-			<h1>4. まとめ ― レイヤーで考える</h1>
+			<h1>4. まとめ ― 効きどころを予測する</h1>
 		</section>
 
 		<section>
@@ -797,14 +816,34 @@ public function equal(Money $o): bool {
 			</ul>
 		</section>
 
-		<section class="goal-slide">
-			<h2>4-3. 持ち帰ってほしいこと</h2>
+		<section>
+			<h2>4-3. 実アプリでは何%効くのか</h2>
+			<p>原則からの予測：Web アプリは IO・内部関数・フレームワークが支配的<br>→ JIT の効きは<span class="key">数%止まりのはず</span></p>
+			<p class="small" style="color:#b91c1c;font-weight:700">TODO：Laravel Welcome ページ（第1章の OPcache 計測と同じ対象）に JIT OFF/ON の計測を追加し、「予測どおり数%」を数字で締める。これで OPcache 章（2 倍速）との対比＝「Web アプリで効くのは OPcache、JIT はドメインの計算」が数字で完結する</p>
+		</section>
+
+		<section>
+			<h2>4-4. 計測の落とし穴 ―「入れたつもり」を防ぐ</h2>
 			<ul class="emph-middle-list">
-				<li>JIT は「OPCODE の実行」を速くするだけ。標準関数の中身は速くならない</li>
-				<li>JIT が効くのは<span class="key">数値計算・コールバック・ドメインロジック</span></li>
-				<li>OPcache は<span class="key">コード量に比例</span>して効く（フレームワーク向き）</li>
-				<li>「JIT」には PCRE JIT など別系統もある</li>
-				<li>レイヤー設計とキャッシュ / JIT の効きどころは対応している</li>
+				<li>phpbench の <code>--php-config</code> は <span class="key">JSON 形式</span>で渡す<br>（例：<code>--php-config='{"opcache.jit_buffer_size": 0}'</code>）<br>→ 形式を誤ると<span class="key">意図しない設定のまま計測</span>してしまう</li>
+				<li><code>opcache.jit_buffer_size = 0</code> は <span class="key">JIT 無効と同義</span> ―「ON にしたつもり」の典型</li>
+			</ul>
+			<p class="small" style="color:#b91c1c;font-weight:700">TODO：実際にハマった実例を 1 枚追加する（誤設定時と正しい設定時の phpbench 出力を並べる。「導入したけど速くなったかわからない」の正体がここ、という位置づけでゴールと接続する）</p>
+		</section>
+
+		<section>
+			<h2>4-5. 自分のアプリで確かめるには</h2>
+			<p class="small" style="color:#b91c1c;font-weight:700">TODO：聴衆が持ち帰れる最小手順を載せる（想定 3 ステップ：① <code>opcache_get_status()</code> / <code>php -i</code> で JIT が本当に有効かを確認 ② 対象処理を hrtime または phpbench で JIT OFF/ON 比較 ③ 効かなければ「時間が C 側にある」と判断できる、という原則の適用手順。ベンチリポジトリ <code>laravel/benchmarks/</code> への導線もこのスライドに置く）</p>
+		</section>
+
+		<section class="goal-slide">
+			<h2>4-6. 持ち帰ってほしいこと</h2>
+			<ul class="emph-middle-list">
+				<li>JIT が速くするのは <span class="key">OPCODE の実行だけ</span>。C の世界（内部関数・new・PCRE）には届かない</li>
+				<li>だから効く / 効かないは<span class="key">「時間がどこで消えているか」で計測前に予測できる</span></li>
+				<li>OPcache は<span class="key">コード量に比例</span>して効く（フレームワーク向き）、JIT は<span class="key">計算が支配的な処理</span>に効く</li>
+				<li>「JIT」には PCRE JIT など別系統もある。<span class="key">アーキ（x86_64 / ARM64）</span>でも結果が変わる</li>
+				<li>設計（VO・ポリモーフィズム）を速度のために曲げる必要はない。削るなら<span class="key">ループ内の new</span></li>
 			</ul>
 		</section>
 
