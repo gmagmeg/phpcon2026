@@ -28,10 +28,6 @@
 		</section>
 
 		<!-- ===== 一行テーマ ===== -->
-		<section class="center-punch">
-			<p>OPcache と JIT がどこに効くのかを計測し、<br>「効く / 効かない」を予測できるようになる</p>
-		</section>
-
 		<!-- ============================================================ -->
 		<!-- イントロ / 前提合わせ -->
 		<!-- ============================================================ -->
@@ -40,8 +36,8 @@
 			OPcache、JIT が
 			<ul class="emph-middle-list">
 						<li>それぞれどこに効くのかを<br>計測して<br>数字で見て<br>理解する</li>
-						<li>効く / 効かないを<br>計測の前に<br>予測できるようになる</li>
-						<li>導入したけれど<br>早くならない<br>早くなったかわからない<br>をなくす</li>
+						<li>効く / 効かないを<br>ある程度、予測できるようになる</li>
+						<li>導入したけれど<br>早くならない、早くなったかわからない<br>をなくす</li>
 					</ul>
 		</section>
 
@@ -49,12 +45,11 @@
 		<!-- 第1章 OPcache の効果計測 -->
 		<!-- ============================================================ -->
 		<section class="section-divider">
-			<h1>1. OPcache の効果計測</h1>
+			<h1>1. OPcache の<br>効果計測</h1>
 		</section>
 
 		<section>
-			<h2>PHP の処理の流れ</h2>
-			<p>PHP の処理フロー概要図</p>
+			<h2>PHP の処理の流れ概要図</h2>
 			<svg class="concept-svg" viewBox="0 0 560 740" role="img" style="max-width:460px;max-height:74vh"
 				aria-label="PHP の処理の流れ：PHP ソース → コンパイル（字句/構文解析）→ OPCODE（中間命令）→ 実行（Zend VM）">
 				<defs>
@@ -135,34 +130,32 @@
 			</svg>
 		</section>
 
-		<section class="lead-bridge">
-			<p>OPcache・JIT を入れると<span class="key">どこまで速くなるのか</span>。<br>作って・測って・確かめてみよう。</p>
+		<section>
+			<p>まずは OPcache がどこに効いて<br>どこまで速くなるのか<br>作って・測って・確かめてる</p>
 		</section>
 
 		<section>
 			<h2>計測環境</h2>
 			<table class="compare-table">
 				<tbody>
-					<tr><td>実行基盤</td><td>Docker（<code>php:8.5-fpm-bookworm</code> / Debian bookworm）</td></tr>
-					<tr><td>PHP</td><td>8.5（OPcache・JIT 同梱、ini / 環境変数で OFF・ON を切替）</td></tr>
-					<tr><td>フレームワーク</td><td>Laravel 13.14（初期 Welcome / 約 500 ファイル）</td></tr>
+					<tr><td>実行基盤</td><td>Docker コンテナ（<code>php:8.5-fpm-bookworm</code> ）</td></tr>
+					<tr><td>PHP</td><td>8.5</td></tr>
+					<tr><td>フレームワーク</td><td>Laravel 13.14</td></tr>
 					<tr><td>計測ライブラリ</td><td>PHPBench 1.7 </td></tr>
 				</tbody>
 			</table>
 		</section>
 
 		<section>
-			<p>効果量は<span class="key">コード量（コンパイル対象の規模）</span>にほぼ比例する。</p>
+			<p>Opecache の効くところはシンプル<br>効果は<span class="ok mark" style="font-size:1.5em;">コード量（コンパイル対象の規模）</span><br>にほぼ比例</p>
 			<div class="checklist">
-				<p class=""><span class="ok mark" style="font-size:1.5em;">↑</span><span class="ok" style="font-weight: bold; font-size:1.5em;">大量のクラス/ファイル</span><br>コンパイルコストが積み上がるため、効果も大きい</p>
-				<p class=""><span class="ng mark" style="font-size:1.5em;">↓</span><span class="ng" style="font-weight: bold; font-size:1.5em;">薄いスクリプト群</span><br>
-					コンパイルコストが元々小さく、効果も薄い</p>
-
+				<p class=""><span class="ok mark" style="font-size:1.5em;">↑</span><span class="ok" style="font-weight: bold; font-size:1.5em;">効果あり：大量のクラス/ファイル</span></p>
+				<p class=""><span class="ng mark" style="font-size:1.5em;">↓</span><span class="ng" style="font-weight: bold; font-size:1.5em;">効果なし or 薄い：薄いスクリプト群</span></p>
 			</div>
 		</section>
 
 		<section>
-			<h2>最も効果を発揮する、Laravelの使用</h2>
+			<h2>Laravel で効果を計測する</h2>
 			<table class="compare-table">
 				<tbody>
 					<tr><td style="white-space:nowrap;font-weight:700">対象</td><td>Laravel の初期 Welcome ページを表示</td></tr>
@@ -174,29 +167,30 @@
 
 		<section>
 			<h2>計測結果</h2>
-			<p>boot時間の短縮に成功</p>
+			<p>Opecache の効果あり</p>
 			<table class="compare-table">
 				<thead>
-					<tr><th>パターン</th><th>1 リクエストのブート時間</th><th>比較</th></tr>
+					<tr><th>パターン</th><th>起動時間 /１リクエスト</th><th>比較</th></tr>
 				</thead>
 				<tbody>
 					<tr><td>OPcache オフ</td><td>146.89 ms</td><td>1.0×（基準）</td></tr>
-					<tr class="highlight"><td>OPcache オン</td><td>71.89 ms</td><td>約 2.04× 速い（約 75ms 短縮）</td></tr>
+					<tr class="highlight"><td>OPcache オン</td><td>71.89 ms</td><td>約 2.04 <br>（約 75ms 短縮）</td></tr>
 				</tbody>
 			</table>
 		</section>
 
 		<section>
 			<h2>逆効果パターン</h2>
-			<p>薄いスクリプトの寄せ集め</p>
-			<p>関数 1 個だけの極小ファイルを N 個 require する</p>
+			<p>薄いスクリプトの寄せ集め<br>関数 1 個だけの極小ファイルを N 個 require する</p>
 			<pre style="font-size:.52em"><code data-trim data-noescape class="language-php">
-// ① 関数1個だけの極小ファイルを N 個生成
+/**
+ * 関数1個だけの極小ファイルを N 個生成
+ */
 for ($i = 0; $i &lt; $n; $i++) {
-    file_put_contents("thin_{$i}.php", "&lt;?php function thin_fn_{$i}(\$x){ return \$x + {$i}; }");
+    file_put_contents("thin_{$i}.php");
 }
 
-// ② それを require するだけ＝「薄いスクリプトの寄せ集め」
+// 読み込み
 $t0 = hrtime(true);
 for ($i = 0; $i &lt; $n; $i++) {
     require "thin_{$i}.php";   // OFF: 毎回コンパイル / ON: file_cache から読むだけ
@@ -207,19 +201,16 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 		</section>
 
 		<section>
-			<h2>計測結果：薄いスクリプトの寄せ集め</h2>
-			<ul>
-				<li>このパターンでは OPcache オンは速くならず、むしろ遅くなる</li>
-				<li>キャッシュから読むオーバーヘッド > 薄いコードをそのまま読むコスト</li>
-			</ul>
-			<table class="compare-table">
+			<h2>計測結果</h2>
+			<p>キャッシュ関連のオーバーヘッド > コードをそのまま読むコスト</p>
+						<table class="compare-table">
 				<thead>
-					<tr><th>require ファイル数</th><th>OPcache オフ</th><th>OPcache オン</th><th>比較</th></tr>
+					<tr><th>require ファイル数</th><th>OPcache オフ</th><th>OPcache オン</th></tr>
 				</thead>
 				<tbody>
-					<tr><td>1 個</td><td>0.030 ms</td><td class="worse">0.036 ms</td><td class="worse">0.83×（速くならない）</td></tr>
-					<tr><td>50 個</td><td>0.199 ms</td><td class="worse">0.243 ms</td><td class="worse">0.82×</td></tr>
-					<tr><td>500 個</td><td>1.636 ms</td><td class="worse">1.891 ms</td><td class="worse">0.87×</td></tr>
+					<tr><td>1 個</td><td>0.030 ms</td><td class="worse">0.036 ms</td></tr>
+					<tr><td>50 個</td><td>0.199 ms</td><td class="worse">0.243 ms</td></tr>
+					<tr><td>500 個</td><td>1.636 ms</td><td class="worse">1.891 ms</td></tr>
 				</tbody>
 			</table>
 
