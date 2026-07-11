@@ -527,6 +527,7 @@ for ($i = 0; $i < 1000; $i++) {
 			<img class="concept-svg" src="images/jit-reach.svg" style="max-width:860px;max-height:52vh;margin-top:0.3em"
 				alt="JIT が届く範囲の復習：VM の世界（ループ・メソッド呼び出し・ユーザー定義関数）には JIT が届くが、C の世界（内部関数の本体・オブジェクト生成 new・PCRE）には届かない">
 		</section>
+
 		<section>
 			<p>実践的なコードでも影響はあるのか、<br>EC のカートをベースに、２つの実装パターンで確かめます</p>
 				<ol >
@@ -587,13 +588,7 @@ $total      = $discounted-&gt;add($shipping);           // ← new
 		</section>
 
 		<section>
-			コレクションの計測
-			
-		</section>
-
-
-		<section>
-			<h2>単一実装 vs ポリモーフィズム</h2>
+			<h2>継承 vs ポリモーフィズム</h2>
 			<p class="small">同じ計算処理を、interface有り無しで比較する</p>
 			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
 interface TransferRiskScorer {
