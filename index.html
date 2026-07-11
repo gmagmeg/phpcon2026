@@ -589,34 +589,45 @@ $total      = $discounted-&gt;add($shipping);           // ← new
 
 		<section>
 			<h2>継承 vs ポリモーフィズム</h2>
-			<p class="small">同じ計算処理を、interface有り無しで比較する</p>
-			<pre style="font-size:.42em"><code data-trim data-noescape class="language-php">
-interface TransferRiskScorer {
-    public function score(TransferRequest $request, int $iteration): int;
+			<p class="small">クーポン割引（年齢 / 会員 / 誕生日）を 2 つの構造で実装 — ルールは同一、構造だけ変える</p>
+			<div style="display:flex;flex-direction:column;gap:.35em;margin-top:.3em">
+				<div>
+					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">継承<span style="font-weight:400;">（共通処理を基底に持つ・1 割引 = 3 フレーム）</span></p>
+					<pre style="margin:.1em 0;font-size:.4em"><code data-trim data-noescape class="language-php">
+abstract class LoyaltyCoupon {
+    public function discountFor(CouponCustomer $c, int $subtotal): int {
+        $d = $this->calculate($c, $subtotal);   // ← 個別ルール（子が実装）
+        return $this->clamp($d, $subtotal);     // ← 共通処理（基底）
+    }
 }
-
-$score += $concrete->score($request, $i);      // 直接 concrete
-$score += $mono->score($request, $i);          // 単一 interface
-$score += $polys[$i % 3]->score($request, $i); // 多態 dispatch
-			</code></pre>
-			<ul class="emph-middle-list small">
-				<li><code>concrete</code> = 直呼び</li>
-				<li><code>mono</code> = interface 1 種</li>
-				<li><code>polys</code> = interface 3 種切替</li>
-			</ul>
+					</code></pre>
+				</div>
+				<div>
+					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">インターフェース<span style="font-weight:400;">（各実装がフラットに完結・1 割引 = 1 フレーム）</span></p>
+					<pre style="margin:.1em 0;font-size:.4em"><code data-trim data-noescape class="language-php">
+final class AgeCoupon implements DiscountCoupon {
+    public function discountFor(CouponCustomer $c, int $subtotal): int {
+        $d = $c->age >= 60 ? intdiv($subtotal, 10) : 0;  // ← 個別ルール
+        // ↓ 上限処理も自前でフラットに
+        return $d > $subtotal ? $subtotal : $d;
+    }
+}
+					</code></pre>
+				</div>
+			</div>
+			<p class="small">どちらも 3 種混在の多型 dispatch。予測：フレームの段数は JIT でも消えない → フラットな interface が有利のはず</p>
 		</section>
 
 		<section>
 			<h2>計測結果</h2>
-			<table class="compare-table small">
-				<thead><tr><th>呼び方</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+			<table class="compare-table dense">
+				<thead><tr><th style="white-space:nowrap">実装</th><th>JIT OFF</th><th>function</th><th>tracing</th><th style="white-space:nowrap">効き幅<br><span style="font-size:.7em;font-weight:400">OFF→tracing</span></th></tr></thead>
 				<tbody>
-					<tr><td>concrete 直呼び</td><td>4.069ms</td><td>2.732ms</td><td>1.836ms</td></tr>
-					<tr><td>単一 interface</td><td>3.930ms</td><td>2.648ms</td><td>1.790ms</td></tr>
-					<tr class="highlight"><td>複数実装 interface</td><td>4.160ms</td><td>2.703ms</td><td>1.988ms</td></tr>
+					<tr><td style="white-space:nowrap">継承（基底経由）</td><td>711.0μs</td><td>432.5μs</td><td>427.3μs</td><td style="white-space:nowrap">約 1.7 倍速</td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">インターフェース</td><td>395.3μs</td><td>194.7μs</td><td><span class="key">197.0μs</span></td><td style="white-space:nowrap"><span class="key">約 2.0 倍速</span></td></tr>
 				</tbody>
 			</table>
-			<p>わりと横並びの結果に。<br>JIT 導入時はポリモーフィズムの有無で、そこまで気にしなくて良さそう</p>
+			<p>フラットな interface 実装が<span style="font-weight:bold">常に約 2 倍速い</span><br>基底クラス経由のフレームは JIT でも消えない</p>
 		</section>
 
 		<section>
