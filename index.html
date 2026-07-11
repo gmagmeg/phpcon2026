@@ -131,7 +131,7 @@
 		</section>
 
 		<section>
-			<p>まずは OPcache がどこに効いて<br>どこまで速くなるのか<br>作って・測って・確かめてる</p>
+			<p>まずは OPcache がどこに効いて<br>どこまで速くなるのか<br>作って・測って・確かめてみる</p>
 		</section>
 
 		<section>
@@ -147,7 +147,7 @@
 		</section>
 
 		<section>
-			<p>Opecache の効くところはシンプル<br>効果は<span class="ok mark" style="font-size:1.5em;">コード量（コンパイル対象の規模）</span><br>にほぼ比例</p>
+			<p>OPcache の効くところはシンプル<br>効果は<span class="ok mark" style="font-size:1.5em;">コード量（コンパイル対象の規模）</span><br>にほぼ比例</p>
 			<div class="checklist">
 				<p class=""><span class="ok mark" style="font-size:1.5em;">↑</span><span class="ok" style="font-weight: bold; font-size:1.5em;">効果あり：大量のクラス/ファイル</span></p>
 				<p class=""><span class="ng mark" style="font-size:1.5em;">↓</span><span class="ng" style="font-weight: bold; font-size:1.5em;">効果なし or 薄い：薄いスクリプト群</span></p>
@@ -167,14 +167,14 @@
 
 		<section>
 			<h2>計測結果</h2>
-			<p>Opecache の効果あり</p>
+			<p>OPcache の効果あり</p>
 			<table class="compare-table">
 				<thead>
 					<tr><th>パターン</th><th>起動時間 /１リクエスト</th><th>比較</th></tr>
 				</thead>
 				<tbody>
 					<tr><td>OPcache オフ</td><td>146.89 ms</td><td>1.0×（基準）</td></tr>
-					<tr class="highlight"><td>OPcache オン</td><td>71.89 ms</td><td>約 2.04 <br>（約 75ms 短縮）</td></tr>
+					<tr class="highlight"><td>OPcache オン</td><td>71.89 ms</td><td>約 2.04 倍速<br>（約 75ms 短縮）</td></tr>
 				</tbody>
 			</table>
 		</section>
@@ -187,7 +187,7 @@
  * 関数1個だけの極小ファイルを N 個生成
  */
 for ($i = 0; $i &lt; $n; $i++) {
-    file_put_contents("thin_{$i}.php");
+    file_put_contents("thin_{$i}.php", /* 関数1個だけの PHP コード */);
 }
 
 // 読み込み
@@ -223,22 +223,22 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 		</section>
 
 		<section class="" style="display:flex!important;flex-direction:column;justify-content:center;align-items:center;min-height:100%;text-align:center">
-			<p>コード量＋ファイルが多いフレームワークで利用すると<br><span class="answer">効果：大 ⤴︎</span></p>
-			<img src="images/laravel-logomark.svg" alt="Laravel" style="height:160px;width:auto">
+			<p>コード量＋ファイルが多いフレームワークで利用すると<br><span class="answer" style="font-size: 2em;">効果：大 ⤴︎</span></p>
+			<img src="images/laravel-logomark.svg" alt="Laravel" style="height:200px;width:auto">
 		</section>
 
 		<!-- ============================================================ -->
 		<!-- 第2章 JIT の効果計測 ― 意外な結果から原則を見つける -->
 		<!-- ============================================================ -->
 		<section class="section-divider">
-			<h1>2. JIT の効果計測<br>― 意外な結果から</h1>
+			<h1>2. JIT の効果計測</h1>
 		</section>
 
 		<section>
 			<h2>JIT の概要</h2>
 			<ul class="emph-middle-list">
-				<li>OPcache 前提で、キャッシュした <span class="key">OPCODE をネイティブ機械語</span>に変換して実行</li>
-				<li>Zend VM を介さず CPU が直接走るため、<span class="key">計算ヘビーな処理</span>ほど効きやすい</li>
+				<li>OPcache 前提</li><li>キャッシュした <span class="key">OPCODE を<br>ネイティブ機械語</span>に変換して実行</li>
+				<li>Zend VM を介さず CPU が直接走るため<br><span class="key">計算ヘビーな処理</span>ほど効きやすい</li>
 			</ul>
 		</section>
 
@@ -246,44 +246,41 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 			<h2>JIT の計測環境</h2>
 			<table class="compare-table">
 				<tbody>
-					<tr><td>CPU / アーキ</td><td>ネイティブ <span class="key">x86_64</span>（AMD EPYC 7763 / GitHub Actions <code>ubuntu-latest</code>）</td></tr>
+					<tr><td>CPU / アーキ</td><td>ネイティブ <span class="key">x86_64</span><br>（GitHub Actions <code>ubuntu-latest</code>）</td></tr>
 					<tr><td>PHP</td><td>8.5（OPcache 前提）</td></tr>
-					<tr><td>JIT モード</td><td><code>OFF</code> / <code>function</code> / <code>tracing</code> の 3 通りで比較（<code>jit_buffer_size</code> = 0 / 64M）</td></tr>
+					<tr><td>JIT モード</td><td><code>OFF</code> / <code>function</code> / <code>tracing</code> <br>（<code>jit_buffer_size</code> = 0 / 64M）</td></tr>
 					<tr><td>計測ライブラリ</td><td>PHPBench</td></tr>
 				</tbody>
 			</table>
-			<p class="small" style="color:#b91c1c;font-weight:700">TODO：全計測の基準アーキを x86_64 に統一する（現状 Money / カートの計測は ARM64。x86_64 で再計測し、アーキ差は第3章末の「おまけ」でのみ扱う）</p>
 		</section>
 
 		<section>
-			<h2>JIT はアーキごとに別実装</h2>
-			<p>PHP の JIT（DynASM ベース）は、アーキごとにコード生成器が分かれている：</p>
+			<h2>実は３つある JIT の実装</h2>
+			<p>CPU アーキテクチャ ごとにコード生成器が分かれている</p>
 			<ul class="emph-middle-list">
 				<li><span class="key">x86</span>（32-bit / i386）</li>
-				<li><span class="key">x86_64</span>(64-bit / AMD64）</li>
+				<li><span class="key">x86_64（今回使用）</span>（64-bit / AMD64）</li>
 				<li><span class="key">ARM64</span>（AArch64 / Apple Silicon 等）</li>
 			</ul>
-			<p class="small">ARM64 対応は比較的新しく、同じコードでも速度が異なる。→ 後ほど実例を紹介</p>
+			<p>x86_64 の JIT が安定。<br>ARM64 は比較的新しく、同じコードでも速度が異なる。<br>→ 後ほど実例を紹介</p>
 		</section>
 
 		<section class="center-punch">
-			<p><span class="key">JIT が効くのはここ</span></p>
+			<p>JIT が効く箇所</p>
 			<img class="concept-svg" src="images/jit-flow.svg" style="max-width:1040px;max-height:62vh;margin-top:0.3em"
 				alt="JIT が効くところ：OPcache 上の OPCODE を JIT が機械語化し、Zend VM を介さず CPU が直接機械語を実行する">
 		</section>
 
 		<!-- つかみ：in_array vs isset（問い → 結果 → 意外な結果 → 種明かし） -->
 		<section>
-			<h2>JIT で isset と in_array() の速度差は縮まるのか</h2>
-			<p><code>in_array</code>：先頭から走査する<span class="key">線形探索 O(n)</span></p>
-
-			<p><code>isset</code>：キー有無を引く<span class="key">ハッシュ参照 O(1)</span>
-				10,000 要素の<span class="key">末尾</span>を探索し、OPcache/JIT の <span class="key">ON と OFF</span> で比較
-			<p style="margin-top:.4em;text-align:center"><span class="key emph-1_2x">どちらも内部関数。JIT で速くなる？</span></p>
+			<h2>JIT は標準関数に<br>どこまで作用するのか計測する</h2>
 		</section>
-
 		<section>
-			<h2>計測コード</h2>
+			<h2>isset と in_array() 速度差は縮まるのか</h2>
+			<p><code>in_array</code>：先頭から走査する <span class="key">線形探索 O(n)</span></p>
+
+			<p><code>isset</code>：キー有無を引く <span class="key">ハッシュ参照 O(1)</span></p>
+			<p>10,000 要素の<span class="key">末尾</span>を探索し、OPcache/JIT の <span class="key">ON と OFF</span> で比較
 
 			<pre style="font-size:.52em"><code data-trim data-noescape class="language-php">
 				// in_array：値の中から探す（得意：値検索）
@@ -303,25 +300,15 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			<h2>計測結果：in_array vs isset</h2>
 
 			<table class="compare-table">
-				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th><th>対 in_array</th></tr></thead>
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
 				<tbody>
-					<tr><td>in_array</td><td>12.70μs</td><td>12.78μs</td><td>12.84μs</td><td>基準</td></tr>
-					<tr><td>isset</td><td>0.029μs</td><td style="color:#c00;font-weight:700;">0.081μs</td><td style="color:#c00;font-weight:700;">0.083μs</td><td>約 150 倍速</td></tr>
+					<tr><td>in_array</td><td>12.70μs</td><td>12.78μs</td><td>12.84μs</td></tr>
+					<tr><td>isset</td><td>0.029μs</td><td style="color:#c00;font-weight:700;">0.081μs</td><td style="color:#c00;font-weight:700;">0.083μs</td></tr>
 				</tbody>
 			</table>
+			<p>in_array は変わらず（誤差の範囲）<br>isset は JIT ありの方がむしろ <span style="color:#c00;font-weight:700; font-size: 1.2em;">遅い</span> 結果に</p>
 		</section>
 
-		<section>
-			<h2>JIT がむしろ逆効果？</h2>
-			<p>isset()ではむしろ逆効果。なぜか？</p>
-			<table class="compare-table">
-				<thead><tr><th>処理</th><th>アーキ</th><th>OFF</th><th>ON</th><th>ON 比</th></tr></thead>
-				<tbody>
-					<tr><td>isset</td><td>ARM64</td><td>0.022μs</td><td style="color:#c00;font-weight:700;">0.079μs</td><td style="color:#c00;font-weight:700;">約 3.6 倍遅い</td></tr>
-					<tr class="highlight"><td>isset</td><td>x86_64</td><td>0.029μs</td><td style="color:#c00;font-weight:700;">0.083μs</td><td style="color:#c00;font-weight:700;">約 2.9 倍遅い</td></tr>
-				</tbody>
-			</table>
-		</section>
 		<section>
 			<p>標準関数は OPCODE の量がそもそも少なく、<br>キャッシュのコスト > JIT の恩恵</p>
 			<pre style="font-size:.5em"><code data-trim data-noescape class="language-c">
@@ -336,17 +323,18 @@ DO_ICALL
 
 		<!-- ===== 原則の宣言（このセッションの核） ===== -->
 		<section class="center-punch">
-			<p><span class="key">JIT が速くするのは OPCODE の実行だけ</span><br>C の世界（内部関数・オブジェクト生成・PCRE）には届かない</p>
-			<p class="small" style="color:#b91c1c;font-weight:700">TODO：処理時間の内訳を「VM 側（JIT が届く）/ C 側（届かない）」で塗り分けた図を追加する（jit-flow.svg を拡張し、内部関数・new・正規表現エンジンを C 側として配置する）</p>
+			<p>JIT が速くするのは<br>OPCODE の実行（画像左）<br>C の世界（画像右）には届かない</p>
+			<img class="concept-svg" src="images/jit-reach.svg" style="max-width:860px;max-height:44vh;margin-top:0.3em"
+				alt="JIT が届く範囲：VM の世界（ループ・メソッド呼び出し・ユーザー定義関数）は JIT が機械語化して速くなるが、C の世界（内部関数の本体・new・PCRE）には届かない">
 		</section>
 
 		<section class="lead-bridge">
-			<p>この原則を使えば、計測の<span class="key">前に</span>結果を予測できるはず。<br>ここからは「<span class="key">予測 → 計測 → 答え合わせ</span>」で確かめていく。</p>
+			<p>ここからは<br><span class="key" style="font-size: 1.5em;">予測 → 計測 → 答え合わせ</span><br>で確かめていきます</p>
 		</section>
 
 		<section>
 			<h2>ケース①：コールバックを取る標準関数</h2>
-			<p>予測：<code>array_map</code> 自体は C だが、<span class="key">コールバックは userland の OPCODE</span> → その部分にだけ効くはず</p>
+			<p>予測<br><code>array_map</code> の実装部分：C なので JIT 適用外<br>コールバック部分：ユーザー定義関数</p><p>ユーザー定義部分に効くはず</p>
 			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
 array_map(
     static fn (int $n): float => $n * 1.5 + $n - ($n / 3.0),
@@ -360,11 +348,11 @@ array_map(
 			<table class="compare-table">
 				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
 				<tbody>
-					<tr><td>array_map</td><td>156.5μs</td><td style="color:#134aa9;font-weight:700;">135.1μs</td><td style="color:#c00;font-weight:700;">138.6μs</td></tr>
-					<tr><td>usort</td><td>2.845ms</td><td style="color:#134aa9;font-weight:700;">2.484ms</td><td style="color:#c00;font-weight:700;">2.482ms</td></tr>
+					<tr><td>array_map</td><td>156.5μs</td><td style="color:#134aa9;font-weight:700;">135.1μs</td><td style="color:#134aa9;font-weight:700;">138.6μs</td></tr>
+					<tr><td>usort</td><td>2.845ms</td><td style="color:#134aa9;font-weight:700;">2.484ms</td><td style="color:#134aa9;font-weight:700;">2.482ms</td></tr>
 				</tbody>
 			</table>
-			<p>予測どおり：コールバック部分（userland）の分だけ効果が出る</p>
+			<p>JIT の効果あり。<br>コールバック部分の分だけ効果が出ている</p>
 		</section>
 
 		<section>
@@ -388,8 +376,8 @@ printf("%.1f μs\n", (hrtime(true) - $start) / 1000);
 			<table class="compare-table">
 				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th><th>pcre.jit OFF</th></tr></thead>
 				<tbody>
-					<tr><td>preg_match ×2000</td><td>501μs</td><td style="color:#134aa9;font-weight:700;">483μs</td><td style="color:#c00;font-weight:700;">483μs</td><td><span class="key">4.44ms</span></td></tr>
-					<tr><td>preg_match_all ×2000</td><td>1.16ms</td><td style="color:#134aa9;font-weight:700;">1.12ms</td><td style="color:#c00;font-weight:700;">1.13ms</td><td><span class="key">7.85ms</span></td></tr>
+					<tr><td>preg_match ×2000</td><td>501μs</td><td style="color:#134aa9;font-weight:700;">483μs</td><td style="color:#134aa9;font-weight:700;">483μs</td><td><span class="key">4.44ms</span></td></tr>
+					<tr><td>preg_match_all ×2000</td><td>1.16ms</td><td style="color:#134aa9;font-weight:700;">1.12ms</td><td style="color:#134aa9;font-weight:700;">1.13ms</td><td><span class="key">7.85ms</span></td></tr>
 				</tbody>
 			</table>
 		</section>
@@ -403,23 +391,26 @@ printf("%.1f μs\n", (hrtime(true) - $start) / 1000);
 		</section>
 
 		<section class="lead-bridge">
-			<p>標準関数が支配的な処理では、JIT の効き幅は薄い。<br>逆に言えば ―― <span class="key">時間を OPCODE 側に寄せれば、効かせられる</span>。</p>
+			<p>標準関数が支配的な処理では、JIT の効き幅は<span style="color: #c00; font-size: 1.5em;">薄い。</span><br>逆に言えば <br><span class="key" style="font-size: 1.5em;">ユーザー定義が多いコード</span><br>なら、効果が上がってくるはず。</p>
 		</section>
 
 		<!-- ============================================================ -->
 		<!-- 第3章 実践編 ― 時間の在処を OPCODE 側に寄せる -->
 		<!-- ============================================================ -->
 		<section class="section-divider">
-			<h1>3. 実践編<br>― 時間の在処を OPCODE 側に寄せる</h1>
+			<h1>3. 実践編<br>― ユーザー定義が多いコードの計測</h1>
 		</section>
 
 		<section>
-			<h2>型が安定した「計算」には効く</h2>
-			<ul class="emph-middle-list">
-				<li>型付きのドメインロジック＝<span class="key">OPCODE 中心の計算</span> → JIT の得意分野</li>
-				<li>ただし<span class="key">オブジェクト生成（new）は C 側の alloc</span> → そこには届かない</li>
-			</ul>
-			<p style="text-align:center"><span class="key emph-1_2x">「クラスで包んだ計算」に効く</span><br>のであって「クラスだから効く」ではない</p>
+			<h2>型情報にも JIT は効く</h2>
+			<p>例：<code>class Money</code></p>
+			<pre><code>class Money {〜}
+class Bank {
+  public function add(Money $money): Money
+}			</code></pre>
+Moneyクラスは「ユーザーが定義した」型情報<br>
+				なので JIT が効く範囲のはず
+			</p>
 		</section>
 
 		<section>
@@ -432,20 +423,9 @@ printf("%.1f μs\n", (hrtime(true) - $start) / 1000);
 		</section>
 
 		<section>
-			<h2>型があるほど JIT が最適化しやすい</h2>
-			<p>引数・戻り値の型宣言などで型が安定しているほど、JIT は次の最適化をしやすい</p>
-			<ul class="emph-middle-list">
-						<li>型チェック・ガードを<span class="key">省略しやすい</span></li>
-						<li><code>int + int</code> を <span class="key">整数加算</span>として特殊化しやすい</li>
-						<li>プロパティアクセスを <span class="key">より直接的な経路</span>へ最適化しやすい</li>
-						<li>小さなメソッドを <span class="key">インライン展開</span>しやすい</li>
-			</ul>
-		</section>
-
-		<section>
 			<h2><code>Money</code> オブジェクト</h2>
 			<p><code>readonly</code> + 型宣言<br>引数・戻り値・プロパティすべてに型がある。</p>
-			<pre style="font-size:.52em"><code data-trim data-noescape class="language-php">
+			<pre style="font-size:.45em"><code data-trim data-noescape class="language-php">
 final class Money
 {
     public function __construct(
@@ -459,14 +439,13 @@ final class Money
     { return new self($this->amount * $f); }
 }
 			</code></pre>
-
 		</section>
 
 		<section>
-			<p class="small">計測内容：オブジェクト生成をループ外へ出せるか（new の位置に注目）</p>
+			<p class="small">計測内容：手続き &gt; ミュータブル &gt; イミュータブル<br>どれもユーザー定義なので効果が出るはず</p>
 			<div style="display:flex;flex-direction:column;gap:.35em;margin-top:.3em">
 				<div>
-					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">手続き</p>
+					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">手続き<span style="font-weight:400;">（new 0 回）</span></p>
 					<pre style="margin:.1em 0;font-size:.4em"><code data-trim data-noescape class="language-php">
 for ($i = 0; $i < 1000; $i++) {
     $acc += ($i + $i) * 2;
@@ -474,20 +453,20 @@ for ($i = 0; $i < 1000; $i++) {
 					</code></pre>
 				</div>
 				<div>
-					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">ミュータブル<span style="font-weight:400;font-size:.8em">（new はループ外で1度だけ・中は破壊的更新）</span></p>
+					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">ミュータブル<span style="font-weight:400;">（ループ外で1度だけ new・破壊的変更）</span></p>
 					<pre style="margin:.1em 0;font-size:.4em"><code data-trim data-noescape class="language-php">
-$m = new MutableMoney(0);                     // ← ループ外
+$m = new MutableMoney(0);            // ← ループ外で1回だけ
 for ($i = 0; $i < 1000; $i++) {
-    $m->set($i)->add($m)->multiply(2);        // in-place（new なし）
+    $m->set($i)->add($m)->multiply(2);   // new なし
     $acc += $m->amount();
 }
 					</code></pre>
 				</div>
 				<div>
-					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">イミュータブル<span style="font-weight:400;font-size:.8em">（add / multiply が毎回 new する）</span></p>
+					<p style="margin:0;color:#134aa9;font-weight:700;font-size:.55em">イミュータブル<span style="font-weight:400;">（ループ内で毎回 new する）</span></p>
 					<pre style="margin:.1em 0;font-size:.4em"><code data-trim data-noescape class="language-php">
 for ($i = 0; $i < 1000; $i++) {
-    $m = new Money($i);                        // ← ループ外に出せない
+    $m = new Money($i);              // ← ループ内で毎回 new
     $acc += $m->add($m)->multiply(2)->amount();
 }
 					</code></pre>
@@ -496,37 +475,62 @@ for ($i = 0; $i < 1000; $i++) {
 		</section>
 
 		<section>
-			<p class="small">計測結果：オブジェクト生成をループ外へ出せるか（new の位置に注目）</p>
-			<table class="compare-table">
-				<thead><tr><th>水準</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
+			<p class="small">計測結果：new の回数 0 / 1 / 1000 回</p>
+			<table class="compare-table dense">
+				<thead><tr><th style="white-space:nowrap">水準</th><th>JIT OFF</th><th>function</th><th>tracing</th><th style="white-space:nowrap">効き幅<br><span style="font-size:.7em;font-weight:400">OFF→tracing</span></th></tr></thead>
 				<tbody>
-					<tr class="highlight"><td>手続き</td><td>5.72μs</td><td>0.79μs</td><td><span class="key">0.78μs</span></td><td><span class="key">約 7.3 倍速</span></td></tr>
-					<tr><td>ミュータブル</td><td>112.9μs</td><td>53.8μs</td><td>54.0μs</td><td>約 2.1 倍速</td></tr>
-					<tr><td>イミュータブル</td><td>235.6μs</td><td>162.8μs</td><td>161.5μs</td><td>約 1.5 倍速</td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">手続き</td><td>5.72μs</td><td>0.79μs</td><td><span class="key">0.78μs</span></td><td style="white-space:nowrap"><span class="key">約 7.3 倍速</span></td></tr>
+					<tr><td style="white-space:nowrap">ミュータブル</td><td>112.9μs</td><td>53.8μs</td><td>54.0μs</td><td style="white-space:nowrap">約 2.1 倍速</td></tr>
+					<tr><td style="white-space:nowrap">イミュータブル</td><td>235.6μs</td><td>162.8μs</td><td>161.5μs</td><td style="white-space:nowrap">約 1.5 倍速</td></tr>
 				</tbody>
 			</table>
-			<p class="small">手続き（ほぼ全部 OPCODE）は 7.3 倍、イミュータブル（毎回 new ＝ C 側 alloc）は 1.5 倍止まり ― <span class="key">原則どおり、new の数が効き幅を決める</span></p>
+			<p class="small">どれも効いてはいるが、<br>イミュータブルは 1.5 倍止まりで一番効きが悪い</p>
 		</section>
 
 		<section>
-			<h2>JIT を効かせても生成コストは残る</h2>
-			<div style="display:flex;align-items:center;justify-content:center;gap:.7em;margin:.6em 0;">
-				<div style="text-align:center;">
-					<div>イミュータブル<br>JIT tracing</div>
-					<div style="font-size:3em;font-weight:800;color:#b91c1c;line-height:1.1;">1,087<span style="font-size:.4em;">ms</span></div>
-				</div>
-				<div style="font-size:3em;font-weight:800;color:#5b6b80;">&gt;</div>
-				<div style="text-align:center;">
-					<div>ミュータブル<br>JIT なし</div>
-					<div style="font-size:3em;font-weight:800;color:#15803d;line-height:1.1;">806<span style="font-size:.4em;">μs</span></div>
-				</div>
-			</div>
-			<p class="small" style="color:#b91c1c;font-weight:700">TODO：単位と計測条件を確認する（Money 計測表は μs オーダーなのに、ここは ms / μs が混在して 3 桁ずれている。別条件（反復数の違い等）なら条件を明記、誤記なら修正する）</p>
+			<p>new の裏側で、C によるメモリ操作が行われる。C の部分なので JIT は効かない</p>
+			<svg class="concept-svg" viewBox="0 0 1240 620" role="img" style="max-width:960px;max-height:58vh"
+				aria-label="イメージ図">
+				<g font-family="inherit">
+					<!-- 凡例 -->
+					<rect x="150" y="20" width="36" height="36" rx="6" fill="#134aa9"/>
+					<text x="200" y="48" font-size="28" fill="#1a2f4a">OPCODE の実行（JIT で縮む）</text>
+					<rect x="680" y="20" width="36" height="36" rx="6" fill="#b91c1c"/>
+					<text x="730" y="48" font-size="28" fill="#1a2f4a">new ＝ C 側 alloc（縮まない）</text>
+
+					<!-- 手続き（new 0 回） -->
+					<text x="60" y="135" font-size="32" font-weight="700" fill="#134aa9">手続き（new 0 回）</text>
+					<text x="100" y="195" font-size="28" fill="#5b6b80">OFF</text>
+					<rect x="180" y="162" width="720" height="48" rx="8" fill="#134aa9"/>
+					<text x="100" y="265" font-size="28" fill="#5b6b80">ON</text>
+					<rect x="180" y="232" width="98" height="48" rx="8" fill="#134aa9"/>
+					<text x="310" y="266" font-size="30" font-weight="700" fill="#15803d">ほぼ全部縮む → 約 7.3 倍速</text>
+
+					<!-- イミュータブル（new 1000 回） -->
+					<text x="60" y="375" font-size="32" font-weight="700" fill="#134aa9">イミュータブル（new 1000 回）</text>
+					<text x="100" y="435" font-size="28" fill="#5b6b80">OFF</text>
+					<rect x="180" y="402" width="290" height="48" rx="8" fill="#134aa9"/>
+					<rect x="470" y="402" width="430" height="48" rx="8" fill="#b91c1c"/>
+					<text x="100" y="505" font-size="28" fill="#5b6b80">ON</text>
+					<rect x="180" y="472" width="60" height="48" rx="8" fill="#134aa9"/>
+					<rect x="240" y="472" width="430" height="48" rx="8" fill="#b91c1c"/>
+					<text x="690" y="506" font-size="30" font-weight="700" fill="#b91c1c">青しか縮まない → 約 1.5 倍速</text>
+
+					<!-- 下部キャプション -->
+					<text x="620" y="590" font-size="32" font-weight="700" fill="#1a2f4a" text-anchor="middle">イメージ図</text>
+				</g>
+			</svg>
+		</section>
+
+		<section class="center-punch">
+			<p>復習：new は <span class="key">C の世界</span>の住人</p>
+			<img class="concept-svg" src="images/jit-reach.svg" style="max-width:860px;max-height:52vh;margin-top:0.3em"
+				alt="JIT が届く範囲の復習：VM の世界（ループ・メソッド呼び出し・ユーザー定義関数）には JIT が届くが、C の世界（内部関数の本体・オブジェクト生成 new・PCRE）には届かない">
 		</section>
 
 		<section>
 			<h2>題材：クーポン割引・送料計算</h2>
-			<p class="small">EC のカート確定処理を、2 実装（連想配列版 / 型付き VO 版）で計測する</p>
+			<p class="small">「new の数が効き幅を決める」は実践的なコードでも成り立つのか。<br>EC のカート確定処理を、2 実装（連想配列版 / 型付き VO 版）で計測して確かめる</p>
 			<ul class="scenario-steps">
 				<li>
 					<span class="step-no">1</span>
@@ -548,36 +552,39 @@ for ($i = 0; $i < 1000; $i++) {
 		</section>
 
 		<section>
-			<h2>実装：クーポンはポリモーフィズム</h2>
+			<h2>実装：型付き VO 版は計算のたびに new が走る</h2>
 			<pre style="font-size:.36em; margin:.2em 0;"><code data-trim data-noescape class="language-php">
-interface Coupon { public function discountFor(Money $subtotal): Money; }
-final class FixedCoupon     implements Coupon { /* 小計を超えない定額   */ }
-final class RateCoupon      implements Coupon { /* 小計の N%           */ }
-final class ThresholdCoupon implements Coupon { /* 閾値以上で固定額     */ }
+interface Coupon { public function discountFor(Money $s): Money; }
+final class FixedCoupon     implements Coupon { /* 定額     */ }
+final class RateCoupon      implements Coupon { /* 率       */ }
+final class ThresholdCoupon implements Coupon { /* 条件付き */ }
 
-// 型付き VO 版：小計 → 割引 → 送料 → 確定
+// 小計 → 割引 → 送料 → 確定
 $subtotal = Money::zero();
-foreach ($cart-&gt;lines as $line) $subtotal = $subtotal-&gt;add($line-&gt;subtotal());
-$discount   = $cart-&gt;coupon-&gt;discountFor($subtotal);   // ← 多態 dispatch
-$discounted = $subtotal-&gt;subtract($discount);
-$shipping   = $policy-&gt;feeFor($discounted, $region, $weight);  // 地域×重量
-$total      = $discounted-&gt;add($shipping);
+foreach ($cart-&gt;lines as $line) {
+    $subtotal = $subtotal-&gt;add($line-&gt;subtotal());   // ← 毎回 new
+}
+$discount   = $cart-&gt;coupon-&gt;discountFor($subtotal);  // ← new
+$discounted = $subtotal-&gt;subtract($discount);         // ← new
+$shipping   = $policy-&gt;feeFor($discounted, $region, $weight);
+$total      = $discounted-&gt;add($shipping);            // ← new
 			</code></pre>
-			<p class="small">配列版は同じルールを <code>switch ($spec['type'])</code> の手続き分岐で実装（<code>CartCheckoutArrayBench</code>）。VO 版は上記クラス群（<code>CartCheckoutTypedBench</code>）。5,000 カート × 4 明細、両版で結果一致を検証済み。</p>
+			<p class="small">配列版は同じルールを <code>switch</code> の手続き分岐で実装（new なし）。5,000 カート × 4 明細、両版で結果一致を検証済み。</p>
+			<p>予測：VO 版は<span class="key">計算のたびに new（C 側）</span> → 配列版より効きにくいはず</p>
 		</section>
 
 		<section>
-			<h2>計測結果：alloc を削ると JIT が効く</h2>
-			<table class="compare-table">
-				<thead><tr><th>実装</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>OFF→tracing</th></tr></thead>
+			<h2>計測結果（答え合わせ）：alloc を削ると JIT が効く</h2>
+			<table class="compare-table dense">
+				<thead><tr><th style="white-space:nowrap">実装</th><th>JIT OFF</th><th>function</th><th>tracing</th><th style="white-space:nowrap">効き幅<br><span style="font-size:.7em;font-weight:400">OFF→tracing</span></th></tr></thead>
 				<tbody>
-					<tr><td>配列</td><td>1.60ms</td><td>1.03ms</td><td>0.94ms</td><td><span class="key">約 1.70 倍速</span></td></tr>
-					<tr><td>VO</td><td>8.96ms</td><td>7.44ms</td><td>6.53ms</td><td><span class="key">約 1.37 倍速</span></td></tr>
-					<tr class="highlight"><td>VO（低alloc）</td><td>2.92ms</td><td>1.95ms</td><td>1.43ms</td><td><span class="key">約 2.04 倍速</span></td></tr>
+					<tr><td style="white-space:nowrap">配列</td><td>1.60ms</td><td>1.03ms</td><td>0.94ms</td><td style="white-space:nowrap"><span class="key">約 1.70 倍速</span></td></tr>
+					<tr><td style="white-space:nowrap">VO</td><td>8.96ms</td><td>7.44ms</td><td>6.53ms</td><td style="white-space:nowrap"><span class="key">約 1.37 倍速</span></td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">VO（低alloc）</td><td>2.92ms</td><td>1.95ms</td><td>1.43ms</td><td style="white-space:nowrap"><span class="key">約 2.04 倍速</span></td></tr>
 				</tbody>
 			</table>
 			<p class="small">配列 = 連想配列版 / VO = 型付き VO 版 / 低alloc = ループ内 new を排した VO（PHP 8.5.7 / ARM64・100 revs × 5 it）</p>
-			<p>VO の重さは <strong>Money 生成（C 側 alloc）</strong>。ループ内の new を削ると <strong>JIT の効き幅が 1.37× → 2.04× に化け</strong>、tracing で配列に迫る。</p>
+			<p>予測どおり、VO（1.37×）は配列（1.70×）より効きにくい。<br>ループ内の new を削った <strong>VO（低alloc）は 2.04×</strong> ― <span class="key">赤（new）を削った分だけ JIT が効く</span></p>
 		</section>
 
 		<section>

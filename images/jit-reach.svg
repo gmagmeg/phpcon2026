@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 600" width="1240" height="600" role="img"
+	aria-label="JIT が届く範囲：VM の世界（ループ・メソッド呼び出し・ユーザー定義関数などの OPCODE 実行）は JIT が機械語化して速くなる。C の世界（内部関数の本体・オブジェクト生成 new・正規表現エンジン PCRE）には JIT は届かず速くならない">
+	<rect x="0" y="0" width="1240" height="600" fill="#ffffff"/>
+	<g font-family="'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Hiragino Sans', 'Yu Gothic', Meiryo, sans-serif" text-anchor="middle">
+
+		<!-- ===== 左：VM の世界（JIT が届く） ===== -->
+		<rect x="40" y="120" width="550" height="460" rx="24" fill="#d97706" fill-opacity="0.05" stroke="#d97706" stroke-width="3" stroke-dasharray="10 7"/>
+		<rect x="82" y="92" width="466" height="56" rx="12" fill="#ffffff"/>
+		<text x="315" y="133" font-size="36" font-weight="700" fill="#d97706">VM の世界（OPCODE の実行）</text>
+
+		<rect x="80" y="180" width="470" height="100" rx="16" fill="#eef3fb" stroke="#134aa9" stroke-width="2.5"/>
+		<text x="315" y="242" font-size="36" font-weight="700" fill="#1a2f4a">ループ・四則演算</text>
+
+		<rect x="80" y="310" width="470" height="100" rx="16" fill="#eef3fb" stroke="#134aa9" stroke-width="2.5"/>
+		<text x="315" y="352" font-size="32" font-weight="700" fill="#1a2f4a">メソッド呼び出し</text>
+		<text x="315" y="392" font-size="32" font-weight="700" fill="#1a2f4a">プロパティアクセス</text>
+
+		<rect x="80" y="440" width="470" height="110" rx="16" fill="#eef3fb" stroke="#134aa9" stroke-width="2.5"/>
+		<text x="315" y="487" font-size="32" font-weight="700" fill="#1a2f4a">ユーザー定義関数</text>
+		<text x="315" y="527" font-size="32" font-weight="700" fill="#1a2f4a">コールバック</text>
+
+		<!-- ===== 右：C の世界（JIT が届かない） ===== -->
+		<rect x="650" y="120" width="550" height="460" rx="24" fill="#b91c1c" fill-opacity="0.04" stroke="#b91c1c" stroke-width="3" stroke-dasharray="10 7"/>
+		<rect x="692" y="92" width="466" height="56" rx="12" fill="#ffffff"/>
+		<text x="925" y="133" font-size="36" font-weight="700" fill="#b91c1c">C の世界（内部実装）</text>
+
+		<rect x="690" y="180" width="470" height="100" rx="16" fill="#fdecec" stroke="#b91c1c" stroke-width="2.5"/>
+		<text x="925" y="222" font-size="34" font-weight="700" fill="#b91c1c">内部関数の本体</text>
+		<text x="925" y="260" font-size="25" fill="#8a5a5a">in_array / isset / array_map など</text>
+
+		<rect x="690" y="310" width="470" height="100" rx="16" fill="#fdecec" stroke="#b91c1c" stroke-width="2.5"/>
+		<text x="925" y="352" font-size="34" font-weight="700" fill="#b91c1c">オブジェクト生成 new</text>
+		<text x="925" y="390" font-size="25" fill="#8a5a5a">メモリ確保（alloc）</text>
+
+		<rect x="690" y="440" width="470" height="110" rx="16" fill="#fdecec" stroke="#b91c1c" stroke-width="2.5"/>
+		<text x="925" y="507" font-size="34" font-weight="700" fill="#b91c1c">正規表現エンジン（PCRE）</text>
+
+	</g>
+</svg>

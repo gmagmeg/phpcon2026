@@ -431,6 +431,15 @@ ol.emph-middle-list li {
     color: var(--accent);
     border-bottom-color: var(--accent);
 }
+/* 列数が多い表向けの詰め表：フォント・パディングを一段小さく */
+.reveal .compare-table.dense {
+    font-size: clamp(18px, 2.2vw, 30px);
+}
+.reveal .compare-table.dense thead th,
+.reveal .compare-table.dense tbody td,
+.reveal .compare-table.dense tbody th {
+    padding: 10px 14px;
+}
 
 /* ---------------------------------------------------------------------
  * 9. 特殊スライド種別（クラスで切り替え）
