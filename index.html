@@ -527,10 +527,17 @@ for ($i = 0; $i < 1000; $i++) {
 			<img class="concept-svg" src="images/jit-reach.svg" style="max-width:860px;max-height:52vh;margin-top:0.3em"
 				alt="JIT が届く範囲の復習：VM の世界（ループ・メソッド呼び出し・ユーザー定義関数）には JIT が届くが、C の世界（内部関数の本体・オブジェクト生成 new・PCRE）には届かない">
 		</section>
+		<section>
+			<p>実践的なコードでも影響はあるのか、<br>EC のカートをベースに、２つの実装パターンで確かめます</p>
+				<ol >
+					<li style="font-size: 1em;">連想配列版</li>
+					<li style="font-size: 1em;">型付き VO 版</li>
+				</ol>
+		</section>
 
 		<section>
 			<h2>題材：クーポン割引・送料計算</h2>
-			<p class="small">「new の数が効き幅を決める」は実践的なコードでも成り立つのか。<br>EC のカート確定処理を、2 実装（連想配列版 / 型付き VO 版）で計測して確かめる</p>
+			
 			<ul class="scenario-steps">
 				<li>
 					<span class="step-no">1</span>
@@ -552,29 +559,22 @@ for ($i = 0; $i < 1000; $i++) {
 		</section>
 
 		<section>
-			<h2>実装：型付き VO 版は計算のたびに new が走る</h2>
-			<pre style="font-size:.36em; margin:.2em 0;"><code data-trim data-noescape class="language-php">
-interface Coupon { public function discountFor(Money $s): Money; }
-final class FixedCoupon     implements Coupon { /* 定額     */ }
-final class RateCoupon      implements Coupon { /* 率       */ }
-final class ThresholdCoupon implements Coupon { /* 条件付き */ }
+			<h2>ベースの実装</h2>
+			<pre style="font-size:.45em; margin:.2em 0;"><code data-trim data-noescape class="language-php">
+// クーポンは interface ＋ 3 実装（定額 / 率 / 条件付き）
+interface Coupon { function discountFor(Money $s): Money; }
 
-// 小計 → 割引 → 送料 → 確定
-$subtotal = Money::zero();
-foreach ($cart-&gt;lines as $line) {
-    $subtotal = $subtotal-&gt;add($line-&gt;subtotal());   // ← 毎回 new
-}
-$discount   = $cart-&gt;coupon-&gt;discountFor($subtotal);  // ← new
-$discounted = $subtotal-&gt;subtract($discount);         // ← new
-$shipping   = $policy-&gt;feeFor($discounted, $region, $weight);
-$total      = $discounted-&gt;add($shipping);            // ← new
+// 小計 → 割引 → 送料 → 確定（Money は演算のたびに new）
+$discount   = $cart-&gt;coupon-&gt;discountFor($subtotal); // ← new
+$discounted = $subtotal-&gt;subtract($discount);        // ← new
+$total      = $discounted-&gt;add($shipping);           // ← new
 			</code></pre>
-			<p class="small">配列版は同じルールを <code>switch</code> の手続き分岐で実装（new なし）。5,000 カート × 4 明細、両版で結果一致を検証済み。</p>
-			<p>予測：VO 版は<span class="key">計算のたびに new（C 側）</span> → 配列版より効きにくいはず</p>
+			<p>ミュータブル版は new せず、代入したオブジェクトを返す</p>
+			<p>予測：イミュータブルなケースは計算のたびに new によるC側のメモリ管理が発生するため、JIT の効果が薄いはず</p>
 		</section>
 
 		<section>
-			<h2>計測結果（答え合わせ）：alloc を削ると JIT が効く</h2>
+			<h2>計測結果</h2>
 			<table class="compare-table dense">
 				<thead><tr><th style="white-space:nowrap">実装</th><th>JIT OFF</th><th>function</th><th>tracing</th><th style="white-space:nowrap">効き幅<br><span style="font-size:.7em;font-weight:400">OFF→tracing</span></th></tr></thead>
 				<tbody>
@@ -583,20 +583,14 @@ $total      = $discounted-&gt;add($shipping);            // ← new
 					<tr class="highlight"><td style="white-space:nowrap">VO（低alloc）</td><td>2.92ms</td><td>1.95ms</td><td>1.43ms</td><td style="white-space:nowrap"><span class="key">約 2.04 倍速</span></td></tr>
 				</tbody>
 			</table>
-			<p class="small">配列 = 連想配列版 / VO = 型付き VO 版 / 低alloc = ループ内 new を排した VO（PHP 8.5.7 / ARM64・100 revs × 5 it）</p>
-			<p>予測どおり、VO（1.37×）は配列（1.70×）より効きにくい。<br>ループ内の new を削った <strong>VO（低alloc）は 2.04×</strong> ― <span class="key">赤（new）を削った分だけ JIT が効く</span></p>
+			<p>想定通り、JIT の効きは<br><span style="font-size:1.2em;font-weight:bold">配列 > ミュータブル > イミュータブル</span></p>
 		</section>
 
 		<section>
-			<h2>効き幅の差：バイトコード vs C 側</h2>
-			<ul style="display:block; box-sizing:border-box;">
-				<li>配列版は <strong>int 演算＋配列アクセス</strong>主体 → JIT がバイトコードを特殊化 → <span class="key">約 1.70 倍速</span></li>
-				<li>VO 版は <strong><code>new Money()</code> のオブジェクト生成（C 側 alloc）</strong>が残る → JIT が届かず効きは薄い（<span class="key">約 1.37 倍</span>）</li>
-				<li>多態 <code>discountFor()</code> も 3 型混在で virtual call が残りインライン化されにくい</li>
-				<li>参考：<strong>純粋な整数ループ</strong>なら tracing で <span class="key">約 9 倍速</span>（JIT が最も効く形）</li>
-				<li>結論：<strong>JIT はバイトコードを速くする</strong>。VO の生成コストは C 側に残り、<span class="key">効き幅も絶対値も差が残る</span>（datetime／Carbon と同じ構図）</li>
-			</ul>
+			コレクションの計測
+			
 		</section>
+
 
 		<section>
 			<h2>単一実装 vs ポリモーフィズム</h2>
