@@ -97,6 +97,16 @@ class InlinedInternalBench
         $this->sink = $acc;
     }
 
+    /** 裸の count: 名前空間フォールバック呼び出し → 専用 opcode 化されない（対比） */
+    public function benchCountUnqualified(): void
+    {
+        $acc = 0;
+        foreach ($this->arrays as $a) {
+            $acc += count($a);
+        }
+        $this->sink = $acc;
+    }
+
     /** \is_int / \is_string → ZEND_TYPE_CHECK 化される */
     public function benchTypeCheck(): void
     {

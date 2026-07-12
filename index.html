@@ -320,6 +320,104 @@ DO_ICALL
 			</code></pre>
 			<p style="margin-top:.5em">OPCODE は 5 行のみ。<br>本体の探索処理は C で書かれた内部実装が行う</p>
 		</section>
+		<section>
+			標準関数は JIT の効果は得られないのか？<br>
+		</section>
+
+		<section>
+			<h2>実はある、JIT が効く標準関数</h2>
+			<p>一部、<span class="key">専用の OPCODE</span> を持つ関数があり、JIT が効く</p>
+			<ul class="emph-middle-list">
+				<li><code>ZEND_STRLEN</code>（strlen）</li>
+				<li><code>ZEND_COUNT</code>（count）</li>
+				<li><code>ZEND_TYPE_CHECK</code>（is_int / is_string 等）</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>専用 OPCODE のしくみ</h2>
+			<p><code>\strlen</code> / <code>\count</code> は関数呼び出しにならない<br>コンパイル時に<span class="key">専用 OPCODE</span> へ変換される</p>
+			<pre style="font-size:.5em"><code data-trim data-noescape class="language-c">
+// 通常の内部関数（in_array など）
+INIT_FCALL   "in_array"
+SEND_VAR     !needle
+SEND_VAR     !values
+DO_ICALL                  ← C 関数を呼び出す
+
+// \strlen($s) はこれだけ
+STRLEN       !s           ← 呼び出しが存在しない
+			</code></pre>
+			<p class="small">専用 OPCODE は「OPCODE の実行」側の住人 → JIT がネイティブ命令に落とせる</p>
+		</section>
+
+		<section>
+			<h2>計測結果：strlen / count</h2>
+			
+			<table class="compare-table dense">
+				<thead><tr><th style="white-space:nowrap">呼び方</th><th>JIT OFF</th><th>function</th><th>tracing</th><th style="white-space:nowrap">効き幅<br><span style="font-size:.7em;font-weight:400">OFF→tracing</span></th></tr></thead>
+				<tbody>
+					<tr><td style="white-space:nowrap">strlen（裸）</td><td style="color:#c00;font-weight:700;">162.3μs</td><td style="color:#c00;font-weight:700;">84.4μs</td><td style="color:#c00;font-weight:700;">85.0μs</td><td style="white-space:nowrap">約 1.9 倍速</td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">\strlen</td><td>85.1μs</td><td>34.3μs</td><td><span class="key">34.1μs</span></td><td style="white-space:nowrap"><span class="key">約 2.5 倍速</span></td></tr>
+					<tr><td style="white-space:nowrap">count（裸）</td><td style="color:#c00;font-weight:700;">—</td><td style="color:#c00;font-weight:700;">—</td><td style="color:#c00;font-weight:700;">—</td><td style="white-space:nowrap">要計測</td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">\count</td><td>78.8μs</td><td>31.2μs</td><td><span class="key">31.1μs</span></td><td style="white-space:nowrap"><span class="key">約 2.5 倍速</span></td></tr>
+				</tbody>
+			</table>
+			
+		</section>
+		<section>
+<p class="small">名前空間内の裸の <code>strlen()</code> は「自名前空間の strlen かもしれない」ため専用 OPCODE 化されず、通常の関数呼び出しに戻る</p>
+<p>専用 OPCODE 化で標準関数なのに<span class="key" style="font-size:1.2em;font-weight:bold">約 2.5 倍速</span><br><code>\</code> を省くと<span style="color:#c00;font-weight:700;">常に約 2 倍遅い</span>（<code>use function strlen;</code> でも同じ効果）</p>
+		</section>
+
+		<section>
+			<h2>計測結果：数学系の演算</h2>
+			<p class="small">主張「<code>sqrt()</code> は JIT で SSE 命令に直接落ちるため劇的に速い」を、同じ形のループで検証</p>
+			<table class="compare-table dense">
+				<thead><tr><th style="white-space:nowrap">処理</th><th>JIT OFF</th><th>function</th><th>tracing</th><th style="white-space:nowrap">効き幅<br><span style="font-size:.7em;font-weight:400">OFF→tracing</span></th></tr></thead>
+				<tbody>
+					<tr class="highlight"><td style="white-space:nowrap">\sqrt 入りループ</td><td>117.0μs</td><td>51.5μs</td><td><span class="key">51.7μs</span></td><td style="white-space:nowrap"><span class="key">約 2.3 倍速</span></td></tr>
+					<tr><td style="white-space:nowrap">\sin 入りループ（対照）</td><td>193.0μs</td><td>114.3μs</td><td>114.0μs</td><td style="white-space:nowrap">約 1.7 倍速</td></tr>
+				</tbody>
+			</table>
+			<p>sqrt は sin より効く（<span class="key" style="font-weight:bold">2.3 vs 1.7 倍</span>）が「劇的」ではない<br>JIT で劇的に効くのは<span class="key" style="font-weight:bold">演算子 ＋ 型推論</span>の側</p>
+		</section>
+
+		<section>
+			<h2>なぜ sqrt の方が効くのか</h2>
+			<svg class="concept-svg" viewBox="0 0 1240 640" role="img" style="max-width:960px;max-height:62vh"
+				aria-label="効き幅の差の図解：1 ループあたりの時間は、JIT で縮む OPCODE 部分（ループ・演算）と、縮まない C 関数部分（呼び出し＋本体）の合計。sqrt は C 部分が軽いので青の縮みがそのまま効いて約 2.3 倍、sin は C 部分が重いので縮んでも赤が残り約 1.7 倍にとどまる">
+				<g font-family="inherit">
+					<!-- 凡例 -->
+					<rect x="120" y="20" width="36" height="36" rx="6" fill="#134aa9"/>
+					<text x="170" y="48" font-size="28" fill="#1a2f4a">ループ・演算の OPCODE（JIT で縮む）</text>
+					<rect x="720" y="20" width="36" height="36" rx="6" fill="#b91c1c"/>
+					<text x="770" y="48" font-size="28" fill="#1a2f4a">C 関数の呼び出し＋本体</text>
+
+					<!-- sqrt（C 部分が軽い） -->
+					<text x="60" y="135" font-size="32" font-weight="700" fill="#134aa9">\sqrt ― C 部分が軽い</text>
+					<text x="100" y="195" font-size="28" fill="#5b6b80">OFF</text>
+					<rect x="180" y="162" width="214" height="48" rx="8" fill="#134aa9"/>
+					<rect x="394" y="162" width="211" height="48" rx="8" fill="#b91c1c"/>
+					<text x="100" y="265" font-size="28" fill="#5b6b80">ON</text>
+					<rect x="180" y="232" width="33" height="48" rx="8" fill="#134aa9"/>
+					<rect x="213" y="232" width="156" height="48" rx="8" fill="#b91c1c"/>
+					<text x="420" y="266" font-size="30" font-weight="700" fill="#15803d">青の縮みがそのまま効く → 約 2.3 倍速</text>
+
+					<!-- sin（C 部分が重い） -->
+					<text x="60" y="385" font-size="32" font-weight="700" fill="#134aa9">\sin ― C 部分が重い</text>
+					<text x="100" y="445" font-size="28" fill="#5b6b80">OFF</text>
+					<rect x="180" y="412" width="214" height="48" rx="8" fill="#134aa9"/>
+					<rect x="394" y="412" width="486" height="48" rx="8" fill="#b91c1c"/>
+					<text x="100" y="515" font-size="28" fill="#5b6b80">ON</text>
+					<rect x="180" y="482" width="33" height="48" rx="8" fill="#134aa9"/>
+					<rect x="213" y="482" width="381" height="48" rx="8" fill="#b91c1c"/>
+					<text x="640" y="516" font-size="30" font-weight="700" fill="#b91c1c">縮んでも赤が残る → 約 1.7 倍速</text>
+
+					<!-- 下部キャプション -->
+					<text x="620" y="610" font-size="32" font-weight="700" fill="#1a2f4a" text-anchor="middle">効き幅は「C 部分（赤）の重さ」で決まる</text>
+				</g>
+			</svg>
+		</section>
 
 		<!-- ===== 原則の宣言（このセッションの核） ===== -->
 		<section class="center-punch">
