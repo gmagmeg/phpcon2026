@@ -45,6 +45,12 @@ class InlinedInternalBench
     /** @var list<string> */
     private array $digitStrings;
 
+    /** 配列イテレーションを挟まず「呼び出しそのもの」を測るための固定値 */
+    private string $fixedString;
+
+    /** @var array<int, int> */
+    private array $fixedArray;
+
     /** DCE 防止: 結果をプロパティに残してループが消されないようにする */
     private int $sink = 0;
 
@@ -65,13 +71,18 @@ class InlinedInternalBench
             };
             $this->digitStrings[] = (string) ($i * 13);
         }
+
+        // strlen / count は配列を歩かず、この固定値を N 回呼ぶ
+        $this->fixedString = \str_repeat('x', 20);
+        $this->fixedArray = \array_fill(0, 4, 0);
     }
 
     /** \strlen: 完全修飾 → ZEND_STRLEN 化される（JIT で消えるはず） */
     public function benchStrlen(): void
     {
         $acc = 0;
-        foreach ($this->strings as $s) {
+        $s = $this->fixedString;
+        for ($i = 0; $i < self::N; $i++) {
             $acc += \strlen($s);
         }
         $this->sink = $acc;
@@ -81,7 +92,8 @@ class InlinedInternalBench
     public function benchStrlenUnqualified(): void
     {
         $acc = 0;
-        foreach ($this->strings as $s) {
+        $s = $this->fixedString;
+        for ($i = 0; $i < self::N; $i++) {
             $acc += strlen($s);
         }
         $this->sink = $acc;
@@ -91,7 +103,8 @@ class InlinedInternalBench
     public function benchCount(): void
     {
         $acc = 0;
-        foreach ($this->arrays as $a) {
+        $a = $this->fixedArray;
+        for ($i = 0; $i < self::N; $i++) {
             $acc += \count($a);
         }
         $this->sink = $acc;
@@ -101,7 +114,8 @@ class InlinedInternalBench
     public function benchCountUnqualified(): void
     {
         $acc = 0;
-        foreach ($this->arrays as $a) {
+        $a = $this->fixedArray;
+        for ($i = 0; $i < self::N; $i++) {
             $acc += count($a);
         }
         $this->sink = $acc;

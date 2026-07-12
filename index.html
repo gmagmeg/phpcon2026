@@ -97,7 +97,7 @@
 					<rect x="120" y="20" width="360" height="110" rx="16" fill="#eef3fb" stroke="#134aa9" stroke-width="2.5"/>
 					<text x="300" y="89" font-size="38" font-weight="700" fill="#1a2f4a">PHP ソース</text>
 
-					<rect x="120" y="240" width="360" height="110" rx="16" fill="#fdecec" stroke="#b91c1c" stroke-width="2.5"/>
+					<rect x="120" y="240" width="360" height="110" rx="16" fill="none" stroke="#b91c1c" stroke-width="2.5"/>
 					<text x="300" y="309" font-size="38" font-weight="700" fill="#b91c1c">コンパイル</text>
 
 					<rect x="120" y="460" width="360" height="110" rx="16" fill="#eef3fb" stroke="#134aa9" stroke-width="2.5"/>
@@ -303,29 +303,19 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
 				<tbody>
 					<tr><td>in_array</td><td>12.70μs</td><td>12.78μs</td><td>12.84μs</td></tr>
-					<tr><td>isset</td><td>0.029μs</td><td style="color:#c00;font-weight:700;">0.081μs</td><td style="color:#c00;font-weight:700;">0.083μs</td></tr>
+					<tr><td>isset</td><td>0.029μs</td><td style="color:#c00;">0.081μs</td><td style="color:#c00;">0.083μs</td></tr>
 				</tbody>
 			</table>
 			<p>in_array は変わらず（誤差の範囲）<br>isset は JIT ありの方がむしろ <span style="color:#c00;font-weight:700; font-size: 1.2em;">遅い</span> 結果に</p>
 		</section>
 
 		<section>
-			<p>標準関数は OPCODE の量がそもそも少なく、<br>キャッシュのコスト > JIT の恩恵</p>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-c">
-INIT_FCALL   3  "in_array"
-SEND_VAR     !needle
-SEND_VAR     !values
-SEND_VAL     true
-DO_ICALL
-			</code></pre>
-			<p style="margin-top:.5em">OPCODE は 5 行のみ。<br>本体の探索処理は C で書かれた内部実装が行う</p>
-		</section>
-		<section>
-			標準関数は JIT の効果は得られないのか？<br>
+			<p>標準関数は C で実装された関数処理の呼び出しが OPCODE の大半を占め、そもそも恩恵が少ない</p><p><span style="color:#c00;font-weight:700; font-size: 1.5em;">キャッシュのコスト</span> > JIT の恩恵</p>
+			<p>標準関数は JIT の効果は得られないのか？</p>
 		</section>
 
 		<section>
-			<h2>実はある、JIT が効く標準関数</h2>
+			<h2>実は JIT が効く標準関数が数十個存在する</h2>
 			<p>一部、<span class="key">専用の OPCODE</span> を持つ関数があり、JIT が効く</p>
 			<ul class="emph-middle-list">
 				<li><code>ZEND_STRLEN</code>（strlen）</li>
@@ -333,6 +323,62 @@ DO_ICALL
 				<li><code>ZEND_TYPE_CHECK</code>（is_int / is_string 等）</li>
 			</ul>
 		</section>
+
+		<section>
+			<h2>計測結果：strlen / count</h2>
+			
+			<table class="compare-table dense">
+				<thead><tr><th style="white-space:nowrap">呼び方</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+				<tbody>
+					<tr><td style="white-space:nowrap">strlen（裸）</td><td>205.1μs</td><td>108.9μs</td><td>109.2μs</td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">\strlen</td><td>108.2μs</td><td>44.4μs</td><td><span class="key">43.9μs</span></td></tr>
+					<tr><td style="white-space:nowrap">count（裸）</td><td>193.8μs</td><td>100.3μs</td><td>100.3μs</td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">\count</td><td>101.1μs</td><td>40.2μs</td><td><span class="key">40.3μs</span></td></tr>
+				</tbody>
+			</table>
+			<p>iseset()やin_array()などでは効果が出ませんでしたが<br>この関数郡では効果を発揮</p>
+
+		</section>
+
+		<section>
+			<h2>なぜ <code>\</code> を付けると速いのか</h2>
+			<p><code>\</code> の有無で自作関数かグローバル関数かが決まる</p>
+			<svg class="concept-svg" viewBox="0 0 1240 620" role="img" style="max-width:1000px;max-height:58vh"
+				aria-label="なぜ バックスラッシュ を付けると速いのか：名前空間内で strlen($s) と書くと、コンパイラは自名前空間の strlen かもしれないと判断し実行時に名前解決する通常の関数呼び出しになるため専用 OPCODE 化されない。バックスラッシュ strlen($s) と書くとグローバル関数と確定するのでコンパイル時に ZEND_STRLEN へ置換され JIT がネイティブ化する">
+				<defs>
+					<marker id="ahk" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+						<path d="M0,0 L7,3 L0,6 Z" fill="#6b7a90"/>
+					</marker>
+				</defs>
+				<g font-family="inherit" text-anchor="middle">
+					<!-- 左：裸（遅い） -->
+					<rect x="60" y="20" width="520" height="80" rx="14" fill="none" stroke="#334155" stroke-width="2.5"/>
+					<text x="320" y="78" font-size="40" font-weight="700" fill="#1a2f4a" font-family="monospace">strlen($s)</text>
+					<line x1="320" y1="100" x2="320" y2="176" stroke="#6b7a90" stroke-width="3" marker-end="url(#ahk)"/>
+
+					<rect x="60" y="188" width="520" height="80" rx="14" fill="none" stroke="#b91c1c" stroke-width="2.5"/>
+					<text x="320" y="235" font-size="30" font-weight="700" fill="#b91c1c">ユーザー作の strlen かも？</text>
+					<line x1="320" y1="288" x2="320" y2="374" stroke="#6b7a90" stroke-width="3" marker-end="url(#ahk)"/>
+
+					<rect x="60" y="386" width="520" height="80" rx="14" fill="none" stroke="#b91c1c" stroke-width="2.5"/>
+					<text x="320" y="440" font-size="32" font-weight="700" fill="#b91c1c">専用 OPCODE を無視</text>
+
+					<!-- 右：\付き（速い） -->
+					<rect x="660" y="20" width="520" height="80" rx="14" fill="none" stroke="#334155" stroke-width="2.5"/>
+					<text x="920" y="78" font-size="40" font-weight="700" fill="#1a2f4a" font-family="monospace">\strlen($s)</text>
+					<line x1="920" y1="100" x2="920" y2="176" stroke="#6b7a90" stroke-width="3" marker-end="url(#ahk)"/>
+
+					<rect x="660" y="188" width="520" height="80" rx="14" fill="none" stroke="#134aa9" stroke-width="2.5"/>
+					<text x="920" y="235" font-size="30" font-weight="700" fill="#134aa9">グローバル関数と確定</text>
+					<line x1="920" y1="288" x2="920" y2="374" stroke="#6b7a90" stroke-width="3" marker-end="url(#ahk)"/>
+
+					<rect x="660" y="386" width="520" height="80" rx="14" fill="none" stroke="#134aa9" stroke-width="2.5"/>
+					<text x="920" y="440" font-size="32" font-weight="700" fill="#134aa9">ZEND_STRLEN へ置換</text>
+				</g>
+			</svg>
+		</section>
+
+
 
 		<section>
 			<h2>専用 OPCODE のしくみ</h2>
@@ -350,20 +396,7 @@ STRLEN       !s           ← 呼び出しが存在しない
 			<p class="small">専用 OPCODE は「OPCODE の実行」側の住人 → JIT がネイティブ命令に落とせる</p>
 		</section>
 
-		<section>
-			<h2>計測結果：strlen / count</h2>
-			
-			<table class="compare-table dense">
-				<thead><tr><th style="white-space:nowrap">呼び方</th><th>JIT OFF</th><th>function</th><th>tracing</th><th style="white-space:nowrap">効き幅<br><span style="font-size:.7em;font-weight:400">OFF→tracing</span></th></tr></thead>
-				<tbody>
-					<tr><td style="white-space:nowrap">strlen（裸）</td><td style="color:#c00;font-weight:700;">162.3μs</td><td style="color:#c00;font-weight:700;">84.4μs</td><td style="color:#c00;font-weight:700;">85.0μs</td><td style="white-space:nowrap">約 1.9 倍速</td></tr>
-					<tr class="highlight"><td style="white-space:nowrap">\strlen</td><td>85.1μs</td><td>34.3μs</td><td><span class="key">34.1μs</span></td><td style="white-space:nowrap"><span class="key">約 2.5 倍速</span></td></tr>
-					<tr><td style="white-space:nowrap">count（裸）</td><td style="color:#c00;font-weight:700;">—</td><td style="color:#c00;font-weight:700;">—</td><td style="color:#c00;font-weight:700;">—</td><td style="white-space:nowrap">要計測</td></tr>
-					<tr class="highlight"><td style="white-space:nowrap">\count</td><td>78.8μs</td><td>31.2μs</td><td><span class="key">31.1μs</span></td><td style="white-space:nowrap"><span class="key">約 2.5 倍速</span></td></tr>
-				</tbody>
-			</table>
-			
-		</section>
+
 		<section>
 <p class="small">名前空間内の裸の <code>strlen()</code> は「自名前空間の strlen かもしれない」ため専用 OPCODE 化されず、通常の関数呼び出しに戻る</p>
 <p>専用 OPCODE 化で標準関数なのに<span class="key" style="font-size:1.2em;font-weight:bold">約 2.5 倍速</span><br><code>\</code> を省くと<span style="color:#c00;font-weight:700;">常に約 2 倍遅い</span>（<code>use function strlen;</code> でも同じ効果）</p>

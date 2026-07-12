@@ -805,6 +805,7 @@ ol.emph-middle-list li {
 /* キーワード強調（太字を使わず色で強調） */
 .key {
     color: var(--accent);
+    font-weight: 700;
 }
 /* 結論テキスト */
 .reveal .answer {
