@@ -4,8 +4,9 @@
     {
       "name": "jit-opc slides",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["start", "--", "--port", "8124"],
-      "port": 8124
+      "runtimeArgs": ["start"],
+      "port": 8124,
+      "autoPort": true
     }
   ]
 }

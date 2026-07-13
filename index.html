@@ -330,10 +330,10 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			<table class="compare-table dense">
 				<thead><tr><th style="white-space:nowrap">呼び方</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
 				<tbody>
-					<tr><td style="white-space:nowrap">strlen（裸）</td><td>205.1μs</td><td>108.9μs</td><td>109.2μs</td></tr>
-					<tr class="highlight"><td style="white-space:nowrap">\strlen</td><td>108.2μs</td><td>44.4μs</td><td><span class="key">43.9μs</span></td></tr>
-					<tr><td style="white-space:nowrap">count（裸）</td><td>193.8μs</td><td>100.3μs</td><td>100.3μs</td></tr>
-					<tr class="highlight"><td style="white-space:nowrap">\count</td><td>101.1μs</td><td>40.2μs</td><td><span class="key">40.3μs</span></td></tr>
+					<tr><td style="white-space:nowrap">strlen（裸）</td><td>145.1μs</td><td>66.8μs</td><td>66.8μs</td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">\strlen</td><td>53.4μs</td><td>7.1μs</td><td><span class="key">7.3μs</span></td></tr>
+					<tr><td style="white-space:nowrap">count（裸）</td><td>147.7μs</td><td>67.4μs</td><td>67.0μs</td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">\count</td><td>44.4μs</td><td>7.2μs</td><td><span class="key">7.2μs</span></td></tr>
 				</tbody>
 			</table>
 			<p>iseset()やin_array()などでは効果が出ませんでしたが<br>この関数郡では効果を発揮</p>
