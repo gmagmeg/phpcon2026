@@ -311,7 +311,22 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 
 		<section>
 			<p>標準関数は C で実装された関数処理の呼び出しが OPCODE の大半を占め、そもそも恩恵が少ない</p><p><span style="color:#c00;font-weight:700; font-size: 1.5em;">キャッシュのコスト</span> > JIT の恩恵</p>
-			<p>標準関数は JIT の効果は得られないのか？</p>
+		</section>
+		<section>
+			<p>標準関数に JIT は <span style="color: #c00; font-size: 1.5em;">逆効果</span> なのか？</p>
+			<p>標準関数でも JIT の恩恵を受ける関数も<span style="font-size:1.5em; color: #134aa9;font-weight:700;">ちゃんとある</span></p>
+		</section>
+
+		<section>
+			<h2>計測結果</h2>
+			<p>array_map, usort() などのコールバックを受け付ける関数は<br>コールバック部分が JIT の効果を受ける</p>
+			<table class="compare-table">
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
+				<tbody>
+					<tr><td>array_map</td><td>156.5μs</td><td style="color:#134aa9;font-weight:700;">135.1μs</td><td style="color:#134aa9;font-weight:700;">138.6μs</td></tr>
+					<tr><td>usort</td><td>2.845ms</td><td style="color:#134aa9;font-weight:700;">2.484ms</td><td style="color:#134aa9;font-weight:700;">2.482ms</td></tr>
+				</tbody>
+			</table>
 		</section>
 
 		<section>
@@ -451,6 +466,7 @@ STRLEN       !s           ← 呼び出しが存在しない
 			<img class="concept-svg" src="images/jit-reach.svg" style="max-width:860px;max-height:44vh;margin-top:0.3em"
 				alt="JIT が届く範囲：VM の世界（ループ・メソッド呼び出し・ユーザー定義関数）は JIT が機械語化して速くなるが、C の世界（内部関数の本体・new・PCRE）には届かない">
 		</section>
+
 
 		<section>
 			<h2>計測結果</h2>

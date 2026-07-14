@@ -18,7 +18,8 @@ use PhpBench\Attributes as Bench;
  *     コンパイルされ専用 opcode 化されない → \strlen() より遅いはず（前提条件の検証）
  *
  * 注意: JIT OFF（jit_buffer_size=0）でも opcache optimizer は動くため、
- * strlen 単体の推定コストは各設定で benchStrlenBaseline を差し引いて比較する。
+ * strlen / count 単体の推定コストは、各設定で対応する
+ * benchStrlenBaseline / benchCountBaseline を差し引いて比較する。
  *
  *   # JIT OFF:
  *   docker compose exec app vendor/bin/phpbench run benchmarks/InlinedInternalBench.php --report=aggregate \
@@ -44,14 +45,14 @@ class InlinedInternalBench
     /** @var list<list<int>> */
     private array $arrays;
 
+    /** @var list<int> count と同じループを回す基準計測用 */
+    private array $arrayCounts;
+
     /** @var list<int|string|float> */
     private array $mixedValues;
 
     /** @var list<string> */
     private array $digitStrings;
-
-    /** @var array<int, int> */
-    private array $fixedArray;
 
     /** DCE 防止: 結果をプロパティに残してループが消されないようにする */
     private int $sink = 0;
@@ -61,14 +62,17 @@ class InlinedInternalBench
         $this->strings = [];
         $this->stringLengths = [];
         $this->arrays = [];
+        $this->arrayCounts = [];
         $this->mixedValues = [];
         $this->digitStrings = [];
 
         for ($i = 0; $i < self::N; $i++) {
             $length = 1 + ($i % 40);
+            $arrayCount = 1 + ($i % 8);
             $this->strings[] = \str_repeat('x', $length);
             $this->stringLengths[] = $length;
-            $this->arrays[] = \array_fill(0, 1 + ($i % 8), $i);
+            $this->arrays[] = \array_fill(0, $arrayCount, $i);
+            $this->arrayCounts[] = $arrayCount;
             $this->mixedValues[] = match ($i % 3) {
                 0 => $i,
                 1 => 'value-' . $i,
@@ -76,8 +80,6 @@ class InlinedInternalBench
             };
             $this->digitStrings[] = (string) ($i * 13);
         }
-
-        $this->fixedArray = \array_fill(0, 4, 0);
     }
 
     /**
@@ -116,13 +118,27 @@ class InlinedInternalBench
         $this->sink = $acc;
     }
 
-    /** \count → ZEND_COUNT 化される */
+    /**
+     * \count: 完全修飾 → ZEND_COUNT 化される。
+     * 毎回異なる配列要素を渡し、固定値のループ不変化を避ける。
+     */
     public function benchCount(): void
     {
         $acc = 0;
-        $a = $this->fixedArray;
+        $arrays = $this->arrays;
         for ($i = 0; $i < self::N; $i++) {
-            $acc += \count($a);
+            $acc += \count($arrays[$i]);
+        }
+        $this->sink = $acc;
+    }
+
+    /** count 計測と同じ「配列参照 + int 加算」を行う基準ループ */
+    public function benchCountBaseline(): void
+    {
+        $acc = 0;
+        $counts = $this->arrayCounts;
+        for ($i = 0; $i < self::N; $i++) {
+            $acc += $counts[$i];
         }
         $this->sink = $acc;
     }
@@ -131,9 +147,9 @@ class InlinedInternalBench
     public function benchCountUnqualified(): void
     {
         $acc = 0;
-        $a = $this->fixedArray;
+        $arrays = $this->arrays;
         for ($i = 0; $i < self::N; $i++) {
-            $acc += count($a);
+            $acc += count($arrays[$i]);
         }
         $this->sink = $acc;
     }
