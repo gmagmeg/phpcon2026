@@ -1,0 +1,87 @@
+name: Benchmark PCRE JIT (native amd64)
+
+# PCRE JIT の効果だけを切り分ける専用ワークフロー。
+# OPcache JIT は常に OFF とし、同一ランナー内で pcre.jit のみを切り替える。
+on:
+  workflow_dispatch:
+    inputs:
+      time_unit:
+        description: "時間単位"
+        type: choice
+        options:
+          - microseconds
+          - milliseconds
+        default: microseconds
+
+concurrency:
+  group: benchmark-pcre-jit-amd64-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: PCRE JIT ON vs OFF
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: laravel
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CPU / arch info
+        run: |
+          echo "arch: $(uname -m)"
+          lscpu | grep -E 'Architecture|Model name|^CPU\(s\)|MHz' || true
+
+      - name: Build app image (native amd64)
+        run: docker compose build app
+
+      - name: Compare PCRE JIT ON / OFF
+        env:
+          IMG: performance-php-app
+          TU: ${{ inputs.time_unit }}
+        run: |
+          set -euo pipefail
+
+          run_mode () { # $1=label $2=expected pcre.jit $3=phpbench php-config
+            local label="$1"
+            local expected="$2"
+            local php_config="$3"
+            local output
+
+            echo "-- ${label} --" | tee -a "$GITHUB_STEP_SUMMARY"
+
+            if ! output=$(docker run --rm \
+              -e EXPECTED_PCRE_JIT="$expected" \
+              "$IMG" \
+              php vendor/bin/phpbench run benchmarks/PcreJitBench.php \
+              --report=aggregate \
+              --time-unit="$TU" \
+              --php-config="$php_config" 2>&1); then
+              echo "$output"
+              return 1
+            fi
+
+            echo "$output"
+            echo "$output" | awk '/^\| /' | tee -a "$GITHUB_STEP_SUMMARY"
+          }
+
+          {
+            echo "## PCRE JIT benchmark — native amd64 ($(uname -m))"
+            echo ""
+            echo "CPU: \`$(lscpu | awk -F: '/Model name/{print $2; exit}' | xargs)\`"
+            echo ""
+            echo "OPcache JIT: OFF（固定）"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          run_mode \
+            "PCRE JIT ON" \
+            "1" \
+            '{"opcache.jit_buffer_size":0,"pcre.jit":1}'
+
+          run_mode \
+            "PCRE JIT OFF" \
+            "0" \
+            '{"opcache.jit_buffer_size":0,"pcre.jit":0}'
+
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

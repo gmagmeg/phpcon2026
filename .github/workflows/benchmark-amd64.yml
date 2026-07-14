@@ -5,7 +5,7 @@ name: Benchmark (native amd64)
 # 手動実行（Actions タブ → Run workflow）。
 #
 # 計測対象はスライドの分類に合わせて 3 ジョブに分割している:
-#   standard … 標準関数（in_array/isset・bcmath・callback・PCRE JIT）
+#   standard … 標準関数（in_array/isset・bcmath・callback）
 #   laravel  … Laravel 層（Eloquent 属性・コンテナ解決・Collection/Str・OPcache boot/thin）
 #   ddd      … DDD 層（Money/VO・Transfer/Cart フロー・多態 dispatch）
 
@@ -38,7 +38,6 @@ jobs:
               benchmarks/InArrayBench.php
               benchmarks/BcmathBench.php
               benchmarks/CallbackBench.php
-              benchmarks/PcreJitBench.php
             shell: ""
           # ── Laravel：フレームワーク層 / OPcache の効きどころ ──
           - category: laravel
@@ -82,7 +81,7 @@ jobs:
       - name: Build app image (native amd64)
         run: docker compose build app
 
-      - name: Run benchmarks (OPcache JIT modes / PCRE JIT ON-OFF)
+      - name: Run benchmarks (OPcache JIT OFF / function / tracing)
         env:
           IMG: performance-php-app          # compose がビルドするイメージ名
           TU: ${{ inputs.time_unit }}
@@ -117,15 +116,9 @@ jobs:
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
 
-            if [[ "$name" == "PcreJitBench" ]]; then
-              # OPcache JIT を OFF に固定し、PCRE 自身の JIT だけを切り替える。
-              run_mode "OFF / PCRE ON"  --php-config='opcache.jit_buffer_size: 0' --php-config='pcre.jit: 1'
-              run_mode "OFF / PCRE OFF" --php-config='opcache.jit_buffer_size: 0' --php-config='pcre.jit: 0'
-            else
-              run_mode "OFF"      --php-config='opcache.jit_buffer_size: 0'
-              run_mode "function" --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: function'
-              run_mode "tracing"  --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: tracing'
-            fi
+            run_mode "OFF"      --php-config='{"opcache.jit_buffer_size":0}'
+            run_mode "function" --php-config='{"opcache.jit_buffer_size":"64M","opcache.jit":"function"}'
+            run_mode "tracing"  --php-config='{"opcache.jit_buffer_size":"64M","opcache.jit":"tracing"}'
 
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           done

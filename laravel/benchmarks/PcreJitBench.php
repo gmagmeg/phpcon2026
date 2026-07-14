@@ -16,9 +16,9 @@ use PhpBench\Attributes as Bench;
  * PCRE JIT だけの効果を比較する場合は、両方とも OPcache JIT を無効にすること。
  *
  *   PCRE JIT ON:
- *     --php-config='opcache.jit_buffer_size: 0' --php-config='pcre.jit: 1'
+ *     --php-config='{"opcache.jit_buffer_size":0,"pcre.jit":1}'
  *   PCRE JIT OFF:
- *     --php-config='opcache.jit_buffer_size: 0' --php-config='pcre.jit: 0'
+ *     --php-config='{"opcache.jit_buffer_size":0,"pcre.jit":0}'
  *
  * preg_replace_callback のコールバックは、一致文字列をそのまま返す最小限の処理にして、
  * PHP 側の処理が PCRE JIT の差を隠しにくいようにしている。
@@ -55,6 +55,15 @@ REGEX;
 
     public function setUp(): void
     {
+        $expectedPcreJit = \getenv('EXPECTED_PCRE_JIT');
+        if ($expectedPcreJit !== false && \ini_get('pcre.jit') !== $expectedPcreJit) {
+            throw new \RuntimeException(\sprintf(
+                'pcre.jit configuration mismatch: expected %s, actual %s',
+                $expectedPcreJit,
+                \var_export(\ini_get('pcre.jit'), true),
+            ));
+        }
+
         $this->strings = [];
         $noise = str_repeat('alpha123 beta456 gamma789 delta012 ', 6);
 
