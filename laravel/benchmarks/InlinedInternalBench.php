@@ -18,12 +18,14 @@ use PhpBench\Attributes as Bench;
  *     コンパイルされ専用 opcode 化されない → \strlen() より遅いはず（前提条件の検証）
  *
  * 注意: JIT OFF（jit_buffer_size=0）でも opcache optimizer は動くため、
- * OFF/ON の差分は「専用 opcode → ネイティブ化」の寄与だけを見ている。
+ * strlen 単体の推定コストは各設定で benchStrlenBaseline を差し引いて比較する。
  *
- *   docker compose exec app vendor/bin/phpbench run benchmarks/InlinedInternalBench.php --report=aggregate
- *   # JIT OFF で比較:
+ *   # JIT OFF:
  *   docker compose exec app vendor/bin/phpbench run benchmarks/InlinedInternalBench.php --report=aggregate \
- *     --php-config='opcache.jit_buffer_size: 0'
+ *     --php-config='{"opcache.enable_cli":1,"opcache.jit_buffer_size":0}'
+ *   # tracing JIT:
+ *   docker compose exec app vendor/bin/phpbench run benchmarks/InlinedInternalBench.php --report=aggregate \
+ *     --php-config='{"opcache.enable_cli":1,"opcache.jit_buffer_size":"64M","opcache.jit":"tracing"}'
  */
 #[Bench\BeforeMethods('setUp')]
 #[Bench\Warmup(2)]
@@ -36,6 +38,9 @@ class InlinedInternalBench
     /** @var list<string> */
     private array $strings;
 
+    /** @var list<int> strlen と同じループを回す基準計測用 */
+    private array $stringLengths;
+
     /** @var list<list<int>> */
     private array $arrays;
 
@@ -44,9 +49,6 @@ class InlinedInternalBench
 
     /** @var list<string> */
     private array $digitStrings;
-
-    /** 配列イテレーションを挟まず「呼び出しそのもの」を測るための固定値 */
-    private string $fixedString;
 
     /** @var array<int, int> */
     private array $fixedArray;
@@ -57,12 +59,15 @@ class InlinedInternalBench
     public function setUp(): void
     {
         $this->strings = [];
+        $this->stringLengths = [];
         $this->arrays = [];
         $this->mixedValues = [];
         $this->digitStrings = [];
 
         for ($i = 0; $i < self::N; $i++) {
-            $this->strings[] = \str_repeat('x', 1 + ($i % 40));
+            $length = 1 + ($i % 40);
+            $this->strings[] = \str_repeat('x', $length);
+            $this->stringLengths[] = $length;
             $this->arrays[] = \array_fill(0, 1 + ($i % 8), $i);
             $this->mixedValues[] = match ($i % 3) {
                 0 => $i,
@@ -72,18 +77,30 @@ class InlinedInternalBench
             $this->digitStrings[] = (string) ($i * 13);
         }
 
-        // strlen / count は配列を歩かず、この固定値を N 回呼ぶ
-        $this->fixedString = \str_repeat('x', 20);
         $this->fixedArray = \array_fill(0, 4, 0);
     }
 
-    /** \strlen: 完全修飾 → ZEND_STRLEN 化される（JIT で消えるはず） */
+    /**
+     * \strlen: 完全修飾 → ZEND_STRLEN 化される。
+     * 毎回異なる配列要素を渡し、固定値のループ不変化を避ける。
+     */
     public function benchStrlen(): void
     {
         $acc = 0;
-        $s = $this->fixedString;
+        $strings = $this->strings;
         for ($i = 0; $i < self::N; $i++) {
-            $acc += \strlen($s);
+            $acc += \strlen($strings[$i]);
+        }
+        $this->sink = $acc;
+    }
+
+    /** strlen 計測と同じ「配列参照 + int 加算」を行う基準ループ */
+    public function benchStrlenBaseline(): void
+    {
+        $acc = 0;
+        $lengths = $this->stringLengths;
+        for ($i = 0; $i < self::N; $i++) {
+            $acc += $lengths[$i];
         }
         $this->sink = $acc;
     }
@@ -92,9 +109,9 @@ class InlinedInternalBench
     public function benchStrlenUnqualified(): void
     {
         $acc = 0;
-        $s = $this->fixedString;
+        $strings = $this->strings;
         for ($i = 0; $i < self::N; $i++) {
-            $acc += strlen($s);
+            $acc += strlen($strings[$i]);
         }
         $this->sink = $acc;
     }

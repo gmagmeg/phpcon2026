@@ -326,7 +326,7 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 
 		<section>
 			<h2>計測結果：strlen / count</h2>
-			
+			<p>この関数郡では効果を発揮</p>
 			<table class="compare-table dense">
 				<thead><tr><th style="white-space:nowrap">呼び方</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
 				<tbody>
@@ -336,8 +336,7 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 					<tr class="highlight"><td style="white-space:nowrap">\count</td><td>44.4μs</td><td>7.2μs</td><td><span class="key">7.2μs</span></td></tr>
 				</tbody>
 			</table>
-			<p>iseset()やin_array()などでは効果が出ませんでしたが<br>この関数郡では効果を発揮</p>
-
+		
 		</section>
 
 		<section>
@@ -394,12 +393,6 @@ DO_ICALL                  ← C 関数を呼び出す
 STRLEN       !s           ← 呼び出しが存在しない
 			</code></pre>
 			<p class="small">専用 OPCODE は「OPCODE の実行」側の住人 → JIT がネイティブ命令に落とせる</p>
-		</section>
-
-
-		<section>
-<p class="small">名前空間内の裸の <code>strlen()</code> は「自名前空間の strlen かもしれない」ため専用 OPCODE 化されず、通常の関数呼び出しに戻る</p>
-<p>専用 OPCODE 化で標準関数なのに<span class="key" style="font-size:1.2em;font-weight:bold">約 2.5 倍速</span><br><code>\</code> を省くと<span style="color:#c00;font-weight:700;">常に約 2 倍遅い</span>（<code>use function strlen;</code> でも同じ効果）</p>
 		</section>
 
 		<section>
@@ -459,21 +452,6 @@ STRLEN       !s           ← 呼び出しが存在しない
 				alt="JIT が届く範囲：VM の世界（ループ・メソッド呼び出し・ユーザー定義関数）は JIT が機械語化して速くなるが、C の世界（内部関数の本体・new・PCRE）には届かない">
 		</section>
 
-		<section class="lead-bridge">
-			<p>ここからは<br><span class="key" style="font-size: 1.5em;">予測 → 計測 → 答え合わせ</span><br>で確かめていきます</p>
-		</section>
-
-		<section>
-			<h2>ケース①：コールバックを取る標準関数</h2>
-			<p>予測<br><code>array_map</code> の実装部分：C なので JIT 適用外<br>コールバック部分：ユーザー定義関数</p><p>ユーザー定義部分に効くはず</p>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
-array_map(
-    static fn (int $n): float => $n * 1.5 + $n - ($n / 3.0),
-    $data
-);
-			</code></pre>
-		</section>
-
 		<section>
 			<h2>計測結果</h2>
 			<table class="compare-table">
@@ -485,6 +463,19 @@ array_map(
 			</table>
 			<p>JIT の効果あり。<br>コールバック部分の分だけ効果が出ている</p>
 		</section>
+
+		<section>
+			<h2>コールバックを取る標準関数</h2>
+			<p><code>array_map</code> の実装部分：C なので JIT 適用外<br>コールバック部分：ユーザー定義関数</p><p>ユーザー定義部分に効くはず</p>
+			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
+array_map(
+    static fn (int $n): float => $n * 1.5 + $n - ($n / 3.0),
+    $data
+);
+			</code></pre>
+		</section>
+
+
 
 		<section>
 			<h2>ケース②：preg_match ― 正規表現エンジンは C 側</h2>
