@@ -422,11 +422,12 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			<table class="compare-table dense">
 				<thead><tr><th>処理</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
 				<tbody>
-					<tr><td style="white-space:nowrap">preg_match ×2000</td><td>516.7μs</td><td>485.5μs</td><td>491.0μs</td></tr>
-					<tr><td style="white-space:nowrap">preg_match_all ×2000</td><td>1.167ms</td><td>1.142ms</td><td>1.145ms</td></tr>
+					<tr><td style="white-space:nowrap">preg_match ×2000</td><td>5.558ms</td><td>5.553ms</td><td>5.524ms</td></tr>
+					<tr><td style="white-space:nowrap">preg_match_all ×2000</td><td>8.758ms</td><td>8.753ms</td><td>8.756ms</td></tr>
+					<tr><td style="white-space:nowrap">preg_replace_callback ×2000</td><td>9.649ms</td><td>9.598ms</td><td>9.590ms</td></tr>
 				</tbody>
 			</table>
-			<p>OPcache JIT のモード差は<span class="key">最大約 6%</span></p>
+			<p>OPcache JIT のモード差は<span class="key">最大約 0.6%</span></p>
 		</section>
 
 		<section>
