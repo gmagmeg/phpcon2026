@@ -82,7 +82,7 @@ jobs:
       - name: Build app image (native amd64)
         run: docker compose build app
 
-      - name: Run benchmarks (JIT OFF / function / tracing)
+      - name: Run benchmarks (OPcache JIT modes / PCRE JIT ON-OFF)
         env:
           IMG: performance-php-app          # compose がビルドするイメージ名
           TU: ${{ inputs.time_unit }}
@@ -117,9 +117,15 @@ jobs:
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
 
-            run_mode "OFF"      --php-config='opcache.jit_buffer_size: 0'
-            run_mode "function" --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: function'
-            run_mode "tracing"  --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: tracing'
+            if [[ "$name" == "PcreJitBench" ]]; then
+              # OPcache JIT を OFF に固定し、PCRE 自身の JIT だけを切り替える。
+              run_mode "OFF / PCRE ON"  --php-config='opcache.jit_buffer_size: 0' --php-config='pcre.jit: 1'
+              run_mode "OFF / PCRE OFF" --php-config='opcache.jit_buffer_size: 0' --php-config='pcre.jit: 0'
+            else
+              run_mode "OFF"      --php-config='opcache.jit_buffer_size: 0'
+              run_mode "function" --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: function'
+              run_mode "tracing"  --php-config='opcache.jit_buffer_size: 64M' --php-config='opcache.jit: tracing'
+            fi
 
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           done

@@ -316,39 +316,57 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			<p>標準関数に JIT は <span style="color: #c00; font-size: 1.5em;">逆効果</span> なのか？</p>
 			<p>標準関数でも JIT の恩恵を受ける関数も<span style="font-size:1.5em; color: #134aa9;font-weight:700;">ちゃんとある</span></p>
 		</section>
-
 		<section>
-			<h2>計測結果</h2>
+			<p>JIT の恩恵を受ける標準関数群</p>
+			<ol>
+				<li>コールバックを受け取る関数群</li>
+				<li>専用 OPECODE を持つ関数</li>
+				<li>正規表現を使う検索、置換関数</li>
+			</ol>
+		</section>
+		<section>
+			<h2>1. コールバックを受け取る<br>関数群</h2>
 			<p>array_map, usort() などのコールバックを受け付ける関数は<br>コールバック部分が JIT の効果を受ける</p>
-			<table class="compare-table">
-				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
-				<tbody>
-					<tr><td>array_map</td><td>156.5μs</td><td style="color:#134aa9;font-weight:700;">135.1μs</td><td style="color:#134aa9;font-weight:700;">138.6μs</td></tr>
-					<tr><td>usort</td><td>2.845ms</td><td style="color:#134aa9;font-weight:700;">2.484ms</td><td style="color:#134aa9;font-weight:700;">2.482ms</td></tr>
-				</tbody>
-			</table>
+			<p><pre><code>function array_map(
+				?callable $callback,
+				array $array,
+				array ...$arrays
+			): array</code></pre></p>
 		</section>
 
 		<section>
-			<h2>実は JIT が効く標準関数が数十個存在する</h2>
-			<p>一部、<span class="key">専用の OPCODE</span> を持つ関数があり、JIT が効く</p>
+			<h2>計測結果</h2>
+			<p>JIT ON の方が速度アップ</p>
+			<table class="compare-table">
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
+				<tbody>
+					<tr><td>array_map</td><td>105.7μs</td><td style="color:#134aa9;font-weight:700;">86.8μs</td><td style="color:#134aa9;font-weight:700;">88.9μs</td></tr>
+					<tr><td>usort</td><td>2.051ms</td><td style="color:#134aa9;font-weight:700;">1.714ms</td><td style="color:#134aa9;font-weight:700;">1.740ms</td></tr>
+				</tbody>
+			</table>
+		</section>
+		<section>
+			<h2>2. 専用 OPCODE を持つ関数</h2>
+			<p>一部、<span class="key">専用の OPCODE</span> を持つ関数がある</p>
+			<p>実行コスト> 関数呼び出し の場合<br>専用 OPCODE が用意されている</p>
 			<ul class="emph-middle-list">
 				<li><code>ZEND_STRLEN</code>（strlen）</li>
 				<li><code>ZEND_COUNT</code>（count）</li>
 				<li><code>ZEND_TYPE_CHECK</code>（is_int / is_string 等）</li>
 			</ul>
+
 		</section>
 
 		<section>
 			<h2>計測結果：strlen / count</h2>
-			<p>この関数郡では効果を発揮</p>
+
 			<table class="compare-table dense">
 				<thead><tr><th style="white-space:nowrap">呼び方</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
 				<tbody>
-					<tr><td style="white-space:nowrap">strlen（裸）</td><td>145.1μs</td><td>66.8μs</td><td>66.8μs</td></tr>
-					<tr class="highlight"><td style="white-space:nowrap">\strlen</td><td>53.4μs</td><td>7.1μs</td><td><span class="key">7.3μs</span></td></tr>
-					<tr><td style="white-space:nowrap">count（裸）</td><td>147.7μs</td><td>67.4μs</td><td>67.0μs</td></tr>
-					<tr class="highlight"><td style="white-space:nowrap">\count</td><td>44.4μs</td><td>7.2μs</td><td><span class="key">7.2μs</span></td></tr>
+					<tr><td style="white-space:nowrap">strlen（裸）</td><td>159.7μs</td><td>94.7μs</td><td>94.2μs</td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">\strlen</td><td>32.1μs</td><td class="key">26.7μs</td><td><span class="key">27.0μs</span></td></tr>
+					<tr><td style="white-space:nowrap">count（裸）</td><td>149.0μs</td><td>86.0μs</td><td>85.4μs</td></tr>
+					<tr class="highlight"><td style="white-space:nowrap">\count</td><td>26.8μs</td><td class="key">22.2μs</td><td><span class="key">22.3μs</span></td></tr>
 				</tbody>
 			</table>
 		
@@ -356,7 +374,7 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 
 		<section>
 			<h2>なぜ <code>\</code> を付けると速いのか</h2>
-			<p><code>\</code> の有無で自作関数かグローバル関数かが決まる</p>
+			<p><code>\</code> の有無で自作関数かグローバル関数かが決まる<br>グローバル関数と分かれば、その分実行が早い</p>
 			<svg class="concept-svg" viewBox="0 0 1240 620" role="img" style="max-width:1000px;max-height:58vh"
 				aria-label="なぜ バックスラッシュ を付けると速いのか：名前空間内で strlen($s) と書くと、コンパイラは自名前空間の strlen かもしれないと判断し実行時に名前解決する通常の関数呼び出しになるため専用 OPCODE 化されない。バックスラッシュ strlen($s) と書くとグローバル関数と確定するのでコンパイル時に ZEND_STRLEN へ置換され JIT がネイティブ化する">
 				<defs>
@@ -375,7 +393,7 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 					<line x1="320" y1="288" x2="320" y2="374" stroke="#6b7a90" stroke-width="3" marker-end="url(#ahk)"/>
 
 					<rect x="60" y="386" width="520" height="80" rx="14" fill="none" stroke="#b91c1c" stroke-width="2.5"/>
-					<text x="320" y="440" font-size="32" font-weight="700" fill="#b91c1c">専用 OPCODE を無視</text>
+					<text x="320" y="440" font-size="32" font-weight="700" fill="#b91c1c">専用 OPCODE 化できない</text>
 
 					<!-- 右：\付き（速い） -->
 					<rect x="660" y="20" width="520" height="80" rx="14" fill="none" stroke="#334155" stroke-width="2.5"/>
@@ -391,122 +409,24 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 				</g>
 			</svg>
 		</section>
-
-
-
 		<section>
-			<h2>専用 OPCODE のしくみ</h2>
-			<p><code>\strlen</code> / <code>\count</code> は関数呼び出しにならない<br>コンパイル時に<span class="key">専用 OPCODE</span> へ変換される</p>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-c">
-// 通常の内部関数（in_array など）
-INIT_FCALL   "in_array"
-SEND_VAR     !needle
-SEND_VAR     !values
-DO_ICALL                  ← C 関数を呼び出す
-
-// \strlen($s) はこれだけ
-STRLEN       !s           ← 呼び出しが存在しない
-			</code></pre>
-			<p class="small">専用 OPCODE は「OPCODE の実行」側の住人 → JIT がネイティブ命令に落とせる</p>
+			<h2>3. 正規表現を使う<br>　 検索、置換関数</h2>
+			<p>opcache.jit 以外にも<br>正規表現パターンをネイティブ化する pcre.jit がある<br><a href="https://www.php.net/manual/ja/pcre.configuration.php">https://www.php.net/manual/ja/pcre.configuration.php</a></p>
+			<p>preg_match(), preg_match_all() などの関数が<br>恩恵を受ける</p>
+			<p></p>
 		</section>
 
 		<section>
-			<h2>計測結果：数学系の演算</h2>
-			<p class="small">主張「<code>sqrt()</code> は JIT で SSE 命令に直接落ちるため劇的に速い」を、同じ形のループで検証</p>
+			<h2>計測結果：正規表現</h2>
+			<p class="small"><code>pcre.jit</code> は全条件で ON（既定）</p>
 			<table class="compare-table dense">
-				<thead><tr><th style="white-space:nowrap">処理</th><th>JIT OFF</th><th>function</th><th>tracing</th><th style="white-space:nowrap">効き幅<br><span style="font-size:.7em;font-weight:400">OFF→tracing</span></th></tr></thead>
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
 				<tbody>
-					<tr class="highlight"><td style="white-space:nowrap">\sqrt 入りループ</td><td>117.0μs</td><td>51.5μs</td><td><span class="key">51.7μs</span></td><td style="white-space:nowrap"><span class="key">約 2.3 倍速</span></td></tr>
-					<tr><td style="white-space:nowrap">\sin 入りループ（対照）</td><td>193.0μs</td><td>114.3μs</td><td>114.0μs</td><td style="white-space:nowrap">約 1.7 倍速</td></tr>
+					<tr><td style="white-space:nowrap">preg_match ×2000</td><td>516.7μs</td><td>485.5μs</td><td>491.0μs</td></tr>
+					<tr><td style="white-space:nowrap">preg_match_all ×2000</td><td>1.167ms</td><td>1.142ms</td><td>1.145ms</td></tr>
 				</tbody>
 			</table>
-			<p>sqrt は sin より効く（<span class="key" style="font-weight:bold">2.3 vs 1.7 倍</span>）が「劇的」ではない<br>JIT で劇的に効くのは<span class="key" style="font-weight:bold">演算子 ＋ 型推論</span>の側</p>
-		</section>
-
-		<section>
-			<h2>なぜ sqrt の方が効くのか</h2>
-			<svg class="concept-svg" viewBox="0 0 1240 640" role="img" style="max-width:960px;max-height:62vh"
-				aria-label="効き幅の差の図解：1 ループあたりの時間は、JIT で縮む OPCODE 部分（ループ・演算）と、縮まない C 関数部分（呼び出し＋本体）の合計。sqrt は C 部分が軽いので青の縮みがそのまま効いて約 2.3 倍、sin は C 部分が重いので縮んでも赤が残り約 1.7 倍にとどまる">
-				<g font-family="inherit">
-					<!-- 凡例 -->
-					<rect x="120" y="20" width="36" height="36" rx="6" fill="#134aa9"/>
-					<text x="170" y="48" font-size="28" fill="#1a2f4a">ループ・演算の OPCODE（JIT で縮む）</text>
-					<rect x="720" y="20" width="36" height="36" rx="6" fill="#b91c1c"/>
-					<text x="770" y="48" font-size="28" fill="#1a2f4a">C 関数の呼び出し＋本体</text>
-
-					<!-- sqrt（C 部分が軽い） -->
-					<text x="60" y="135" font-size="32" font-weight="700" fill="#134aa9">\sqrt ― C 部分が軽い</text>
-					<text x="100" y="195" font-size="28" fill="#5b6b80">OFF</text>
-					<rect x="180" y="162" width="214" height="48" rx="8" fill="#134aa9"/>
-					<rect x="394" y="162" width="211" height="48" rx="8" fill="#b91c1c"/>
-					<text x="100" y="265" font-size="28" fill="#5b6b80">ON</text>
-					<rect x="180" y="232" width="33" height="48" rx="8" fill="#134aa9"/>
-					<rect x="213" y="232" width="156" height="48" rx="8" fill="#b91c1c"/>
-					<text x="420" y="266" font-size="30" font-weight="700" fill="#15803d">青の縮みがそのまま効く → 約 2.3 倍速</text>
-
-					<!-- sin（C 部分が重い） -->
-					<text x="60" y="385" font-size="32" font-weight="700" fill="#134aa9">\sin ― C 部分が重い</text>
-					<text x="100" y="445" font-size="28" fill="#5b6b80">OFF</text>
-					<rect x="180" y="412" width="214" height="48" rx="8" fill="#134aa9"/>
-					<rect x="394" y="412" width="486" height="48" rx="8" fill="#b91c1c"/>
-					<text x="100" y="515" font-size="28" fill="#5b6b80">ON</text>
-					<rect x="180" y="482" width="33" height="48" rx="8" fill="#134aa9"/>
-					<rect x="213" y="482" width="381" height="48" rx="8" fill="#b91c1c"/>
-					<text x="640" y="516" font-size="30" font-weight="700" fill="#b91c1c">縮んでも赤が残る → 約 1.7 倍速</text>
-
-					<!-- 下部キャプション -->
-					<text x="620" y="610" font-size="32" font-weight="700" fill="#1a2f4a" text-anchor="middle">効き幅は「C 部分（赤）の重さ」で決まる</text>
-				</g>
-			</svg>
-		</section>
-
-		<!-- ===== 原則の宣言（このセッションの核） ===== -->
-		<section class="center-punch">
-			<p>JIT が速くするのは<br>OPCODE の実行（画像左）<br>C の世界（画像右）には届かない</p>
-			<img class="concept-svg" src="images/jit-reach.svg" style="max-width:860px;max-height:44vh;margin-top:0.3em"
-				alt="JIT が届く範囲：VM の世界（ループ・メソッド呼び出し・ユーザー定義関数）は JIT が機械語化して速くなるが、C の世界（内部関数の本体・new・PCRE）には届かない">
-		</section>
-
-
-		<section>
-			<h2>計測結果</h2>
-			<table class="compare-table">
-				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
-				<tbody>
-					<tr><td>array_map</td><td>156.5μs</td><td style="color:#134aa9;font-weight:700;">135.1μs</td><td style="color:#134aa9;font-weight:700;">138.6μs</td></tr>
-					<tr><td>usort</td><td>2.845ms</td><td style="color:#134aa9;font-weight:700;">2.484ms</td><td style="color:#134aa9;font-weight:700;">2.482ms</td></tr>
-				</tbody>
-			</table>
-			<p>JIT の効果あり。<br>コールバック部分の分だけ効果が出ている</p>
-		</section>
-
-		<section>
-			<h2>コールバックを取る標準関数</h2>
-			<p><code>array_map</code> の実装部分：C なので JIT 適用外<br>コールバック部分：ユーザー定義関数</p><p>ユーザー定義部分に効くはず</p>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
-array_map(
-    static fn (int $n): float => $n * 1.5 + $n - ($n / 3.0),
-    $data
-);
-			</code></pre>
-		</section>
-
-
-
-		<section>
-			<h2>ケース②：preg_match ― 正規表現エンジンは C 側</h2>
-			<p>予測：正規表現の照合は C（PCRE）の仕事 → JIT は効かないはず</p>
-			<p class="small">同じパターンで preg_match を 2,000 回・時間を計測</p>
-			<pre style="font-size:.5em"><code data-trim data-noescape class="language-php">
-$pattern = '/(\w+)@(\w+)\.(com|net|org|co\.jp)|(\d{4})-(\d{2})-(\d{2})/';
-$strings = [/* 2,000 件の文字列 */];
-
-$start = hrtime(true);
-foreach ($strings as $s) {
-    preg_match($pattern, $s, $m);
-}
-printf("%.1f μs\n", (hrtime(true) - $start) / 1000);
-			</code></pre>
+			<p>OPcache JIT のモード差は<span class="key">最大約 6%</span></p>
 		</section>
 
 		<section>
