@@ -297,23 +297,24 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			</section>
 
 		<section>
-			<h2>計測結果：in_array vs isset</h2>
+			<h2>計測結果：in_array vs キー参照</h2>
 
-			<table class="compare-table">
+			<table class="compare-table dense">
 				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
 				<tbody>
-					<tr><td>in_array</td><td>12.70μs</td><td>12.78μs</td><td>12.84μs</td></tr>
-					<tr><td>isset</td><td>0.029μs</td><td style="color:#c00;">0.081μs</td><td style="color:#c00;">0.083μs</td></tr>
+					<tr><td>in_array</td><td>12.540μs</td><td>12.652μs</td><td>12.620μs</td></tr>
+					<tr><td>isset</td><td>0.026μs</td><td style="color:#c00;">0.027μs</td><td style="color:#c00;">0.029μs</td></tr>
+					<tr><td>array_key_exists</td><td>0.039μs</td><td style="color:#c00;">0.41μs</td><td style="color:#c00;">0.42μs</td></tr>
 				</tbody>
 			</table>
-			<p>in_array は変わらず（誤差の範囲）<br>isset は JIT ありの方がむしろ <span style="color:#c00;font-weight:700; font-size: 1.2em;">遅い</span> 結果に</p>
+			<p>どの関数も変わらず JIT ありの方がむしろ僅かに <span style="color:#c00;font-weight:700; font-size: 1.2em;">遅い</span></p>
 		</section>
 
 		<section>
 			<p>標準関数は C で実装された関数処理の呼び出しが OPCODE の大半を占め、そもそも恩恵が少ない</p><p><span style="color:#c00;font-weight:700; font-size: 1.5em;">キャッシュのコスト</span> > JIT の恩恵</p>
 		</section>
 		<section>
-			<p>標準関数に JIT は <span style="color: #c00; font-size: 1.5em;">逆効果</span> なのか？</p>
+			<p>標準関数に JIT は <span style="color: #c00; font-size: 1.5em;">効果がない</span>のか？</p>
 			<p>標準関数でも JIT の恩恵を受ける関数も<span style="font-size:1.5em; color: #134aa9;font-weight:700;">ちゃんとある</span></p>
 		</section>
 		<section>
@@ -442,6 +443,10 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 		</section>
 
 		<section>
+			四則演算、ループ、条件判定に効果がある
+		</section>
+
+		<section>
 			<h2>型定義、型情報にも JIT は効く</h2>
 			<p>型宣言そのものではなく、型付きのユーザー定義コードが最適化対象</p>
 			<p>型が明確だと、JIT は値の型を推論しやすくなる</p>
@@ -542,7 +547,7 @@ for ($i = 0; $i < 1000; $i++) {
 
 		<section>
 			<h2>題材：クーポン割引・送料計算</h2>
-			
+
 			<ul class="scenario-steps">
 				<li>
 					<span class="step-no">1</span>
@@ -598,46 +603,38 @@ $total      = $discounted-&gt;add($shipping);           // ← new
 		</section>
 
 		<section>
-			<h2>ハマりポイント 1<br><code>--php-config</code> の渡し方</h2>
-			<p class="small">phpbench の設定は、<span class="key">1つの JSON</span>にまとめる</p>
-			<pre style="font-size:.42em"><code data-trim data-noescape class="language-bash">
-# NG：複数回指定すると、先頭の設定だけが採用される
---php-config='opcache.jit_buffer_size: 0' \
---php-config='pcre.jit: 0'
+			<h2>設定値で気をつけること</h2>
+			<h3>Opcacheのデフォルト設定</h3>
+			<p>アプリケーションとCLIの設定値は別れているので注意。</p>
+				<p>・Web アプリケーション：Opcache は初期設定で ON</p>
+				<p>・CLI実行：Opcache は初期設定で OFF<br>
+					このような実行形式には無効になっている<br>
+								<pre><code>php artisan queue:work</code></pre>
+				</p>
 
-# OK：1つの JSON にまとめる
---php-config='{"opcache.jit_buffer_size":0,"pcre.jit":0}'
-			</code></pre>
-			<p class="small">ラベル上は OFF でも、実際には ON のまま計測していた</p>
+			<p>
+		</section>
+		<section>
+			<p>JIT はデフォルトで OFF になっている</p>
+			<table class="compare-table dense" style="font-size:.6em;">
+				<thead>
+					<tr><th>項目</th><th>8.3 まで</th><th>8.4 以降</th></tr>
+				</thead>
+				<tbody>
+					<tr><td style="white-space:nowrap">opcache.jit</td><td><code>tracing</code></td><td><code>disable</code></td></tr>
+					<tr><td style="white-space:nowrap">opcache.jit_buffer_size</td><td><code>0</code></td><td><code>64M</code></td></tr>
+					<tr><td>OFF になる理由</td><td>buffer_size = 0</td><td>jit = disable</td></tr>
+				</tbody>
+			</table>
+			<p class="small">8.4 以降は <code>opcache.jit_buffer_size</code> だけでは JIT は有効化されない</p>
 		</section>
 
 		<section>
-			<h2>ハマりポイント 2<br>「有効にしたつもり」を防ぐ</h2>
-			<ul class="emph-middle-list" style="font-size:.64em;width:auto;margin-left:.4em;margin-right:.4em;padding-left:1.2em">
-				<li><code>opcache.jit_buffer_size = 0</code> なら <span class="key">JIT は無効</span></li>
-				<li>CLI と FPM では<span class="key">読み込む php.ini が異なる</span>ことがある</li>
-				<li>計測プロセス内で<br><code>ini_get()</code> / <code>opcache_get_status()</code> を確認する</li>
-			</ul>
-			<p class="small">設定値が期待と違う場合は、計測を失敗させるのが安全</p>
+			<h2>JIT ON ではデバッグしにくい</h2>
+			<p><span class="key">Xdebug と PHP JIT は併用できない</span><br>Xdebug を読み込むと警告が出て、JIT は無効になる</p>
+			<p>ソースを再読み込み（not ブラウザリロード）しないと、修正内容が反映されない</p>
+			<p>開発環境では OFF、本番環境では ON にするのが推奨パターン</p>
 		</section>
-
-		<section>
-			<h2>ハマりポイント 3<br>JIT ON ではデバッグしにくい</h2>
-			<ul class="emph-middle-list" style="font-size:.66em;width:auto;margin-left:.4em;margin-right:.4em;padding-left:1.2em">
-				<li><span class="key">Xdebug と PHP JIT は併用できない</span><br>Xdebug を読み込むと警告が出て、JIT は無効になる</li>
-				<li>JIT 固有の問題を再現中は、ステップ実行やカバレッジを使えない</li>
-				<li>実行経路が hot になってから機械語化されるため、再現条件も増える</li>
-			</ul>
-			<p>開発・デバッグ環境は <span class="key">JIT OFF</span><br>本番相当の検証・ベンチ環境だけ <span class="key">JIT ON</span></p>
-			<p class="small"><a href="https://xdebug.org/docs/compat">xdebug.org/docs/compat</a></p>
-		</section>
-
-		<section>
-			<h2>測って分かったこと</h2>
-			> その一方で両方ともデフォルト設定のまま運用しているケースは多々あり、<br>それぞれの特性を活かせていると言い切れる現場も多くないはずです。
-			勇気を持ってJITをON
-		</section>
-
 		<!-- ============================================================ -->
 		<!-- 第4章 まとめ -->
 		<!-- ============================================================ -->
@@ -654,15 +651,6 @@ $total      = $discounted-&gt;add($shipping);           // ← new
 					<tr><td>JIT</td><td>OPCODE 計算が支配的な処理</td><td>コアドメイン・数値計算層</td></tr>
 				</tbody>
 			</table>
-		</section>
-
-		<section>
-			<h2>4-2. アーキテクチャとの相乗効果</h2>
-			<ul class="emph-middle-list">
-				<li><span class="key">外部依存の層（フレームワーク・I/O）</span> → OPcache が効く</li>
-				<li><span class="key">コアドメインの層（純粋なロジック・計算）</span> → JIT が効く</li>
-				<li>「関心の分離」をすると、高速化の効きどころも自然と分離される</li>
-			</ul>
 		</section>
 
 		<section class="goal-slide">
