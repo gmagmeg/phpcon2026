@@ -10,6 +10,7 @@ use PhpBench\Attributes as Bench;
  * 四則演算とループ制御そのものに対する JIT の効果を比較するベンチマーク。
  *
  * - 四則演算: ユーザーランドの float 演算だけを繰り返す
+ * - 整数除算: intdiv() で整数のまま除算を繰り返す
  * - for / foreach: 本体を空にし、ループ制御だけを測る
  * - foreach の対象配列は setUp() で作るため、配列生成コストは含めない
  *
@@ -41,6 +42,9 @@ class ArithmeticAndLoopBench
 
     /** 演算結果を残し、計測対象の演算を不要な計算にしない。 */
     private float $sink = 0.0;
+
+    /** 整数除算の結果を残す。 */
+    private int $integerSink = 0;
 
     public function setUp(): void
     {
@@ -85,6 +89,16 @@ class ArithmeticAndLoopBench
             $value /= 1.000001;
         }
         $this->sink = $value;
+    }
+
+    /** 整数除算（intdiv）。ループごとに値を変え、整数の結果依存を維持する。 */
+    public function benchIntegerDivision(): void
+    {
+        $value = 1000000000;
+        for ($i = 0; $i < self::N; $i++) {
+            $value = \intdiv($value + $i, 3);
+        }
+        $this->integerSink = $value;
     }
 
     /** for の制御コスト。本体は意図的に空。 */

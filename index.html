@@ -439,18 +439,63 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 		<!-- 第3章 実践編 ― 時間の在処を OPCODE 側に寄せる -->
 		<!-- ============================================================ -->
 		<section class="section-divider">
-			<h1>3. 実践編<br>― ユーザー定義が多いコードの計測</h1>
+			<h2>ユーザー定義コードの計測</h2>
+			<p>普段書くコードに、どこまで JIT の効果がでるのかを計測していきます</p>
+			<p>・四則演算</p>
+			<p>・ループ</p>
+			<p>・条件判定</p>
 		</section>
 
 		<section>
-			四則演算、ループ、条件判定に効果がある
+			<h2>計測結果：四則演算</h2>
+			<p>加減乗は JIT で<span class="key">約 3.7〜3.8 倍高速</span></p>
+			<p>一方、除算は JIT を有効にしても速くならない</p>
+			<table class="compare-table dense">
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
+				<tbody>
+					<tr><td>加算（+）</td><td>42.685μs</td><td class="key">11.311μs</td><td class="key">11.329μs</td></tr>
+					<tr><td>減算（−）</td><td>42.452μs</td><td class="key">11.312μs</td><td class="key">11.298μs</td></tr>
+					<tr><td>乗算（×）</td><td>42.427μs</td><td class="key">11.343μs</td><td class="key">11.238μs</td></tr>
+					<tr><td>除算（÷）</td><td>84.799μs</td><td class="worse">88.079μs</td><td class="worse">88.184μs</td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<section>
+			<h2>連続除算は CPU の待ち時間が支配する</h2>
+			<p>JIT は PHP VM の処理を減らせるが、<br>CPU 命令そのものの待ち時間は減らせない</p>
+			<table class="compare-table dense">
+				<thead><tr><th>処理</th><th>支配的なコスト</th><th>JIT 有効時</th></tr></thead>
+				<tbody>
+					<tr><td>加減乗</td><td>PHP VM の実行処理</td><td class="key">大部分を削減</td></tr>
+					<tr><td>除算</td><td>CPU の除算命令</td><td>待ち時間が残る</td></tr>
+				</tbody>
+			</table>
+			<p><code>1.000001</code> で割っているため、<br><span class="key">0 除算チェックが原因ではない</span></p>
+			<p class="small"><code>x / c</code> を <code>x * (1 / c)</code> に変えると丸め結果が変わるため、同じ処理ではない</p>
+		</section>
+
+		<section>
+			<h2>計測結果：ループ制御</h2>
+			<p><code>for</code> は約 6 倍、<code>foreach</code> は約 1.9 倍高速</p>
+			<table class="compare-table dense">
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
+				<tbody>
+					<tr><td>for</td><td>29.426μs</td><td class="key">4.841μs</td><td class="key">4.856μs</td></tr>
+					<tr><td>foreach</td><td>39.305μs</td><td class="key">20.746μs</td><td class="key">20.931μs</td></tr>
+				</tbody>
+			</table>
+			
+		</section>
+		<section>
+			if文 や match式内に演算があれば効果あり。<br>
+			比較であれば効果はない	
 		</section>
 
 		<section>
 			<h2>型定義、型情報にも JIT は効く</h2>
 			<p>型宣言そのものではなく、型付きのユーザー定義コードが最適化対象</p>
 			<p>型が明確だと、JIT は値の型を推論しやすくなる</p>
-
 		</section>
 		<section>
 			<h2>みんな大好き<br>バリューオブジェクトの例</h2>
@@ -598,8 +643,16 @@ $total      = $discounted-&gt;add($shipping);           // ← new
 			オブジェクトの生成コストは高い<br>ということはふんわり頭に入っていつつも<br>数値で出して改めて実感
 		</section>
 		<section>
-			閑話休題<br><br>
-			ここからは OPcache・JIT のハマりポイント
+			閑話休題<br><br>JIT は ON にした方がいいのか？
+		</section>
+		<section>
+			ON にした方がいい。<br>
+			効果がないケースはあれど、遅延するケースはない。<br>
+			設定値も編集する必要はない。<br>
+			ただしmsの世界なので、過大な期待は禁物。
+		</section>
+		<section>
+			ここからは OPcache・JIT 適用時のハマりポイント
 		</section>
 
 		<section>
@@ -651,17 +704,6 @@ $total      = $discounted-&gt;add($shipping);           // ← new
 					<tr><td>JIT</td><td>OPCODE 計算が支配的な処理</td><td>コアドメイン・数値計算層</td></tr>
 				</tbody>
 			</table>
-		</section>
-
-		<section class="goal-slide">
-			<h2>4-3. 持ち帰ってほしいこと</h2>
-			<ul class="emph-middle-list">
-				<li>JIT が速くするのは <span class="key">OPCODE の実行だけ</span>。C の世界（内部関数・new・PCRE）には届かない</li>
-				<li>だから効く / 効かないは<span class="key">「時間がどこで消えているか」で計測前に予測できる</span></li>
-				<li>OPcache は<span class="key">コード量に比例</span>して効く（フレームワーク向き）、JIT は<span class="key">計算が支配的な処理</span>に効く</li>
-				<li>「JIT」には PCRE JIT など別系統もある。<span class="key">アーキ（x86_64 / ARM64）</span>でも結果が変わる</li>
-				<li>設計（VO・ポリモーフィズム）を速度のために曲げる必要はない。削るなら<span class="key">ループ内の new</span></li>
-			</ul>
 		</section>
 
 		<section>
