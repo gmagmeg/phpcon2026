@@ -447,9 +447,14 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 		</section>
 
 		<section>
-			<h2>計測結果：四則演算</h2>
+			<h2>四則演算の計測</h2>
+<pre><code>for ($i = 0; $i < self::N; $i++) {}</code></pre>
+<pre><code>foreach ($this->loopValues as $_) {}</code></pre>
+		</section>
+		<section>
+			<h2>計測結果</h2>
 			<p>加減乗は JIT で<span class="key">約 3.7〜3.8 倍高速</span></p>
-			<p>一方、除算は JIT を有効にしても速くならない</p>
+			<p>一方、除算は JIT を有効にしても、CPU の演算コストが上回り、遅くなる結果に<br>いろんなパターンを試すも、除算は安定せず...</p>
 			<table class="compare-table dense">
 				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
 				<tbody>
@@ -462,21 +467,13 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 		</section>
 
 		<section>
-			<h2>連続除算は CPU の待ち時間が支配する</h2>
-			<p>JIT は PHP VM の処理を減らせるが、<br>CPU 命令そのものの待ち時間は減らせない</p>
-			<table class="compare-table dense">
-				<thead><tr><th>処理</th><th>支配的なコスト</th><th>JIT 有効時</th></tr></thead>
-				<tbody>
-					<tr><td>加減乗</td><td>PHP VM の実行処理</td><td class="key">大部分を削減</td></tr>
-					<tr><td>除算</td><td>CPU の除算命令</td><td>待ち時間が残る</td></tr>
-				</tbody>
-			</table>
-			<p><code>1.000001</code> で割っているため、<br><span class="key">0 除算チェックが原因ではない</span></p>
-			<p class="small"><code>x / c</code> を <code>x * (1 / c)</code> に変えると丸め結果が変わるため、同じ処理ではない</p>
-		</section>
-
-		<section>
-			<h2>計測結果：ループ制御</h2>
+			<h2>ループ制御の計測</h2>
+			<p>純粋なループを計測するために本体処理は空</p>
+<pre><code>for ($i = 0; $i < self::N; $i++) {}</code></pre>
+<pre><code>foreach ($this->loopValues as $_) {}</code></pre>
+</section>
+<section>
+	<h2>計測結果</h2>
 			<p><code>for</code> は約 6 倍、<code>foreach</code> は約 1.9 倍高速</p>
 			<table class="compare-table dense">
 				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>

@@ -15,7 +15,9 @@ use PhpBench\Attributes as Bench;
  * - foreach の対象配列は setUp() で作るため、配列生成コストは含めない
  *
  * 各四則演算の値には for ループのコストも含まれる。演算だけを見たい場合は、
- * 同じ JIT 設定の benchForEmpty を未丸め値のまま差し引いて比較する。
+ * 同じ JIT 設定の benchFloatArithmeticBaseline を未丸め値のまま差し引く。
+ * benchIntegerDivision は、同じ計算のうち intdiv() だけを除いた
+ * benchIntegerDivisionBaseline を差し引く。
  *
  * # JIT OFF
  * docker compose exec app vendor/bin/phpbench run benchmarks/ArithmeticAndLoopBench.php --report=aggregate \
@@ -91,12 +93,31 @@ class ArithmeticAndLoopBench
         $this->sink = $value;
     }
 
+    /** float 四則演算用の基準ループ。初期化と結果保存も計測対象と揃える。 */
+    public function benchFloatArithmeticBaseline(): void
+    {
+        $value = 0.0;
+        for ($i = 0; $i < self::N; $i++) {
+        }
+        $this->sink = $value;
+    }
+
     /** 整数除算（intdiv）。ループごとに値を変え、整数の結果依存を維持する。 */
     public function benchIntegerDivision(): void
     {
         $value = 1000000000;
         for ($i = 0; $i < self::N; $i++) {
             $value = \intdiv($value + $i, 3);
+        }
+        $this->integerSink = $value;
+    }
+
+    /** 整数除算用の基準ループ。intdiv() 以外の加算と代入を揃える。 */
+    public function benchIntegerDivisionBaseline(): void
+    {
+        $value = 1000000000;
+        for ($i = 0; $i < self::N; $i++) {
+            $value = $value + $i;
         }
         $this->integerSink = $value;
     }
