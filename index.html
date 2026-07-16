@@ -485,8 +485,21 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			
 		</section>
 		<section>
-			if文 や match式内に演算があれば効果あり。<br>
-			比較であれば効果はない	
+			<h2>単純比較にも JIT は効く</h2>
+			<p class="small">厳密比較は単純判定でも大きく短縮<br>計算結果の match は伸びが小さい</p>
+			<table class="compare-table dense">
+				<thead><tr><th>判定</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+				<tbody>
+					<tr><td>単純 if <code>==</code></td><td>61.3μs</td><td>32.7μs</td><td>34.2μs</td></tr>
+					<tr><td>単純 if <code>===</code></td><td>15.6μs</td><td class="key">3.4μs</td><td class="key">4.8μs</td></tr>
+					<tr><td>単純 switch</td><td>81.9μs</td><td>41.2μs</td><td>42.3μs</td></tr>
+					<tr><td>単純 match</td><td>23.3μs</td><td class="key">2.8μs</td><td class="key">3.5μs</td></tr>
+					<tr><td>計算結果 if</td><td>44.1μs</td><td class="key">9.6μs</td><td class="key">7.6μs</td></tr>
+					<tr><td>計算結果 switch</td><td>37.5μs</td><td class="key">7.6μs</td><td class="key">7.5μs</td></tr>
+					<tr><td>計算結果 match</td><td>107.2μs</td><td>85.9μs</td><td>86.0μs</td></tr>
+				</tbody>
+			</table>
+			
 		</section>
 
 		<section>
@@ -495,25 +508,14 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			<p>型が明確だと、JIT は値の型を推論しやすくなる</p>
 		</section>
 		<section>
-			<h2>みんな大好き<br>バリューオブジェクトの例</h2>
-			<p><code>readonly</code> + 型宣言<br>引数・戻り値・プロパティすべてに型定義</p>
-			<pre style="font-size:.45em"><code data-trim data-noescape class="language-php">
-final class Money
-{
-    public function __construct(
-        private readonly int $amount
-    ) {}
-
-    public function add(Money $o): self
-    { return new self($this->amount + $o->amount); }
-
-    public function multiply(int $f): self
-    { return new self($this->amount * $f); }
+			<h2>Money クラスを定義して計測</h2>
+						<pre style="font-size:.45em"><code data-trim data-noescape class="language-php">
+final class Money {
+    public function __construct( private readonly int $amount) {}
+    public function add(Money $o): self { return new self($this->amount + $o->amount); }
+    public function multiply(int $f): self { return new self($this->amount * $f); }
 }
 			</code></pre>
-		</section>
-
-		<section>
 			<ol>
 				<li>ミュータブル</li>
 				<li>イミュータブル</li>
@@ -559,25 +561,25 @@ for ($i = 0; $i < 1000; $i++) {
 		</section>
 
 		<section>
-			<p>new には JIT が効かないため、この差が生まれる</p><p>new の裏側では C によるメモリ操作が行われるが、 JIT はこの C の部分までは届かない</p>
+			<p>new には JIT が効かないため、この差が生まれる</p><p>new の裏側では C によるメモリ操作が行われる<br>しかし JIT はこの C の部分までは届かない</p>
 			<svg class="concept-svg" viewBox="0 0 1240 620" role="img" style="max-width:960px;max-height:58vh"
 				aria-label="イメージ図">
 				<g font-family="inherit">
 					<!-- 凡例 -->
 					<rect x="150" y="20" width="36" height="36" rx="6" fill="#134aa9"/>
-					<text x="200" y="48" font-size="28" fill="#1a2f4a">OPCODE の実行（JIT で縮む）</text>
-					<rect x="680" y="20" width="36" height="36" rx="6" fill="#b91c1c"/>
-					<text x="730" y="48" font-size="28" fill="#1a2f4a">new ＝ C 側 alloc（縮まない）</text>
+					<text x="200" y="48" fill="#1a2f4a">OPCODE の実行（JIT で縮む）</text>
+					<rect x="150" y="78" width="36" height="36" rx="6" fill="#b91c1c"/>
+					<text x="200" y="108" fill="#1a2f4a">new ＝ C 側 alloc（縮まない）</text>
 
 					<!-- イミュータブル（new 1000 回） -->
-					<text x="60" y="175" font-size="32" font-weight="700" fill="#134aa9">イミュータブル（new 1000 回）</text>
-					<text x="100" y="235" font-size="28" fill="#5b6b80">OFF</text>
-					<rect x="180" y="202" width="290" height="48" rx="8" fill="#134aa9"/>
-					<rect x="470" y="202" width="430" height="48" rx="8" fill="#b91c1c"/>
-					<text x="100" y="305" font-size="28" fill="#5b6b80">ON</text>
-					<rect x="180" y="272" width="60" height="48" rx="8" fill="#134aa9"/>
-					<rect x="240" y="272" width="430" height="48" rx="8" fill="#b91c1c"/>
-					<text x="690" y="306" font-size="30" font-weight="700" fill="#b91c1c">青しか縮まない → 約 1.5 倍速</text>
+					<text x="60" y="195" font-size="40" font-weight="700" fill="#134aa9">イミュータブル（new 1000 回）</text>
+					<text x="100" y="265" font-size="40" fill="#5b6b80">OFF</text>
+					<rect x="190" y="222" width="300" height="48" rx="8" fill="#134aa9"/>
+					<rect x="480" y="222" width="540" height="48" rx="8" fill="#b91c1c"/>
+					<text x="100" y="345" font-size="40" fill="#5b6b80">ON</text>
+					<rect x="190" y="312" width="60" height="48" rx="8" fill="#134aa9"/>
+					<rect x="250" y="312" width="450" height="48" rx="8" fill="#b91c1c"/>
+					<text x="710" y="346" font-size="30" font-weight="700" fill="#b91c1c">青しか縮まない → 約 1.5 倍速</text>
 
 				</g>
 			</svg>

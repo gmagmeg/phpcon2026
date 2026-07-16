@@ -46,7 +46,7 @@ class ConditionalBench
     private array $booleanValues;
 
     /** @var list<int> 単純判定の分岐結果と同じ値を持つ基準ループ用。 */
-    private array $booleanResults;
+    private array $booleanResults;  
 
     /** 分岐結果を残し、計測対象の処理を不要な計算にしない。 */
     private int $sink = 0;
