@@ -34,7 +34,8 @@ class MoneyBench
     /** DCE 防止: 結果をプロパティに残してループが消されないようにする */
     private int $sink = 0;
 
-    /** A: 手続き（生スカラー演算。add → multiply 相当を素の int で） */F    public function benchScalar(): void
+    /** A: 手続き（生スカラー演算。add → multiply 相当を素の int で） */
+    public function benchScalar(): void
     {
         $acc = 0;
         for ($i = 0; $i < self::N; $i++) {
