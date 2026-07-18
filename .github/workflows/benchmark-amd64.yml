@@ -36,6 +36,7 @@ jobs:
           - category: standard
             benches: >-
               benchmarks/InArrayBench.php
+              benchmarks/InArrayHotLoopBench.php
               benchmarks/BcmathBench.php
               benchmarks/CallbackBench.php
             shell: ""
