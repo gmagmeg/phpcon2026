@@ -21,7 +21,7 @@ use PhpBench\Attributes as Bench;
 #[Bench\Iterations(5)]
 class CallbackBench
 {
-    private const N = 5000;
+    private const N = 10000;
 
     private array $data;
     private array $sortData;

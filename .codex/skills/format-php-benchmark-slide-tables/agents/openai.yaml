@@ -1,0 +1,4 @@
+interface:
+  display_name: "PHPベンチマーク表の整形"
+  short_description: "PHPBenchの基準差引・1回換算表をスライドへ反映"
+  default_prompt: "Use $format-php-benchmark-slide-tables to format these PHPBench results for the project slide deck."

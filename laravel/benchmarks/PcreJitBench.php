@@ -29,7 +29,7 @@ use PhpBench\Attributes as Bench;
 #[Bench\Iterations(5)]
 class PcreJitBench
 {
-    private const SUBJECT_COUNT = 2000;
+    private const SUBJECT_COUNT = 10000;
 
     /** @var list<string> */
     private array $strings;

@@ -19,6 +19,7 @@
     --text: #111111; /* 本文色 */
     --base-red: #b91c1c; /* 警告・NG・最終レスポンス */
     --heading-navy: #1a2f4a; /* 見出し色 */
+    --accent-red: #c00;
 
     /* Reveal テーマの上書き */
     --r-heading-text-transform: none; /* 見出しを大文字化しない（入力の大小を維持） */
@@ -441,6 +442,16 @@ ol.emph-middle-list li {
     padding: 10px 14px;
 }
 
+/* ベンチマークの計測結果：5列でも処理名と換算値を1行で表示する */
+.reveal .compare-table.benchmark-result-table {
+    font-size: clamp(16px, 1.8vw, 24px);
+}
+.reveal .compare-table.benchmark-result-table thead th,
+.reveal .compare-table.benchmark-result-table tbody td {
+    padding: 9px 8px;
+    white-space: nowrap;
+}
+
 /* ---------------------------------------------------------------------
  * 9. 特殊スライド種別（クラスで切り替え）
  * ------------------------------------------------------------------- */
@@ -535,6 +546,17 @@ ol.emph-middle-list li {
 }
 .reveal section.center-punch .answer {
     font-size: clamp(64px, 8vw, 104px);
+}
+
+/* JIT 導入目的：説明を3行で固定して読みやすくする */
+.reveal section.jit-purpose-slide p {
+    font-size: clamp(28px, 3.2vw, 38px);
+    line-height: 1.7;
+    text-align: center;
+}
+.reveal section.jit-purpose-slide p span {
+    display: block;
+    white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------------
@@ -807,6 +829,12 @@ ol.emph-middle-list li {
     color: var(--accent);
     font-weight: 700;
 }
+
+.key-red {
+    color: var(--accent-red);
+    font-weight: 700;
+}
+
 /* 結論テキスト */
 .reveal .answer {
     font-size: 46px;

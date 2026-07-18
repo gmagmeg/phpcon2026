@@ -226,7 +226,9 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 			<p>コード量＋ファイルが多いフレームワークで利用すると<br><span class="answer" style="font-size: 2em;">効果：大 ⤴︎</span></p>
 			<img src="images/laravel-logomark.svg" alt="Laravel" style="height:200px;width:auto">
 		</section>
-
+		<section>
+			デフォルトで ON になっているので、<br>そのまま利用しましょう。
+		</section>
 		<!-- ============================================================ -->
 		<!-- 第2章 JIT の効果計測 ― 意外な結果から原則を見つける -->
 		<!-- ============================================================ -->
@@ -241,6 +243,28 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 				<li>Zend VM を介さず CPU が直接走るため<br><span class="key">計算ヘビーな処理</span>ほど効きやすい</li>
 			</ul>
 		</section>
+		<section>
+			<h2>JIT が導入された目的</h2>
+			<p>PHP コードを機械語化し、実行コストを下げる。<br>
+				特に、計算負荷の高い処理を高速化する。<br>
+				Web 以外の <span class="key" style="font-size: 1.2em;">CPU 集約用途</span> へ、PHP	 を広げる。
+			</p>
+			<p><a href="https://wiki.php.net/rfc/jit">参考：JIT のプロポーザル https://wiki.php.net/rfc/jit</a></p>
+		</section>
+		<section>
+			<h2>CPU アーキテクチャごとに分かれる実装</h2>
+			<ul class="emph-middle-list">
+				<li><span class="key">x86</span>（32-bit / i386）</li>
+				<li><span class="key">x86_64（今回使用）</span>（64-bit / AMD64）</li>
+				<li><span class="key">ARM64</span>（AArch64 / Apple Silicon 等）</li>
+			</ul>
+			<p>同じコードでも結果に差異が出るので<br> JIT の計測をするときは要注意</p>
+		</section>
+
+		<section>
+			<h2>JIT は Web 開発でも効果的なのか？<br>標準関数にどこまで作用するのか<br>計測していきます</h2>
+		</section>
+
 
 		<section>
 			<h2>JIT の計測環境</h2>
@@ -254,16 +278,7 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 			</table>
 		</section>
 
-		<section>
-			<h2>実は３つある JIT の実装</h2>
-			<p>CPU アーキテクチャ ごとにコード生成器が分かれている</p>
-			<ul class="emph-middle-list">
-				<li><span class="key">x86</span>（32-bit / i386）</li>
-				<li><span class="key">x86_64（今回使用）</span>（64-bit / AMD64）</li>
-				<li><span class="key">ARM64</span>（AArch64 / Apple Silicon 等）</li>
-			</ul>
-			<p>x86_64 の JIT が安定。<br>ARM64 は比較的新しく、同じコードでも速度が異なる。<br>→ 後ほど実例を紹介</p>
-		</section>
+
 
 		<section class="center-punch">
 			<p>JIT が効く箇所</p>
@@ -272,9 +287,7 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 		</section>
 
 		<!-- つかみ：in_array vs isset（問い → 結果 → 意外な結果 → 種明かし） -->
-		<section>
-			<h2>JIT は標準関数に<br>どこまで作用するのか計測する</h2>
-		</section>
+
 		<section>
 			<h2>isset と in_array() 速度差は縮まるのか</h2>
 			<p><code>in_array</code>：先頭から走査する <span class="key">線形探索 O(n)</span></p>
@@ -297,28 +310,68 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 			</section>
 
 		<section>
-			<h2>計測結果：in_array vs キー参照</h2>
+			<h2>計測結果：ホットループ</h2>
 
-			<table class="compare-table dense">
-				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
+			<p class="small">1計測関数 = 対象処理を1万回実行<br>1万回分（基準ループ差引後の推定値）</p>
+			<table class="compare-table dense benchmark-result-table">
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>１回あたり</th></tr></thead>
 				<tbody>
-					<tr><td>in_array</td><td>12.540μs</td><td>12.652μs</td><td>12.620μs</td></tr>
-					<tr><td>isset</td><td>0.026μs</td><td style="color:#c00;">0.027μs</td><td style="color:#c00;">0.029μs</td></tr>
-					<tr><td>array_key_exists</td><td>0.039μs</td><td style="color:#c00;">0.41μs</td><td style="color:#c00;">0.42μs</td></tr>
+					<tr><td>in_array</td><td>78,788.0μs</td><td>78,139.1μs</td><td>78,271.6μs</td><td>7,878.8 / 7,813.9 ns</td></tr>
+					<tr><td>isset</td><td>37.6μs</td><td class="key">4.1μs</td><td class="key">2.4μs</td><td>3.8 / 0.2 ns</td></tr>
+					<tr><td>array_key_exists</td><td>53.7μs</td><td class="worse">62.6μs</td><td class="worse">61.2μs</td><td>6.3 / 5.4 ns</td></tr>
 				</tbody>
 			</table>
-			<p>どの関数も変わらず JIT ありの方がむしろ僅かに <span style="color:#c00;font-weight:700; font-size: 1.2em;">遅い</span></p>
+			<p class="small">１回あたり：最大値 / 最小値</p>
+			<p class="small">※ rstdev 20%超を含むため、差引後の値は傾向として読む</p>
+			<p><code>isset</code> は短縮、<code>in_array</code> はほぼ変わらない</p>
 		</section>
+		<section>
+			<h2>標準関数の呼び出しフロー</h2>
+			<svg class="concept-svg" viewBox="0 0 1200 370" role="img" style="max-width:1050px;max-height:43vh"
+				aria-label="標準関数の呼び出しフロー。PHP コードから関数呼び出し OPCODE が生成され、Zend VM または JIT 生成コードがそれを実行して、C 実装の標準関数を呼び出す。PHP JIT が最適化できるのは OPCODE とその実行部分で、C 実装の本体処理は対象外">
+				<defs>
+					<marker id="ah-internal-call" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+						<path d="M0,0 L8,4 L0,8 Z" fill="#6b7a90"/>
+					</marker>
+				</defs>
+				<g font-family="inherit" text-anchor="middle">
+					<rect x="25" y="55" width="235" height="130" rx="18" fill="#eef3fb" stroke="#134aa9" stroke-width="3"/>
+					<text x="142" y="108" font-size="31" font-weight="700" fill="#1a2f4a">PHP コード</text>
+					<text x="142" y="151" font-size="27" fill="#134aa9">in_array(...)</text>
 
-		<section>
-			<p>標準関数は C で実装された関数処理の呼び出しが OPCODE の大半を占め、そもそも恩恵が少ない</p><p><span style="color:#c00;font-weight:700; font-size: 1.5em;">キャッシュのコスト</span> > JIT の恩恵</p>
+					<line x1="265" y1="120" x2="305" y2="120" stroke="#6b7a90" stroke-width="4" marker-end="url(#ah-internal-call)"/>
+					<text x="285" y="35" font-size="34">コンパイル</text>
+
+					<rect x="315" y="55" width="235" height="130" rx="18" fill="#eef3fb" stroke="#134aa9" stroke-width="3"/>
+					<text x="432" y="108" font-size="29" font-weight="700" fill="#1a2f4a">関数呼び出し</text>
+					<text x="432" y="151" font-size="30" font-weight="700" fill="#134aa9">OPCODE</text>
+
+					<line x1="555" y1="120" x2="595" y2="120" stroke="#6b7a90" stroke-width="4" marker-end="url(#ah-internal-call)"/>
+					<text x="575" y="35" font-size="34">実行</text>
+
+					<rect x="605" y="55" width="250" height="130" rx="18" fill="#eef3fb" stroke="#134aa9" stroke-width="3"/>
+					<text x="730" y="105" font-size="28" font-weight="700" fill="#1a2f4a">Zend VM /</text>
+					<text x="730" y="149" font-size="28" font-weight="700" fill="#134aa9">JIT 生成コード</text>
+
+					<line x1="860" y1="120" x2="900" y2="120" stroke="#6b7a90" stroke-width="4" marker-end="url(#ah-internal-call)"/>
+					<text x="880" y="35" font-size="34">C 関数を呼ぶ</text>
+
+					<rect x="910" y="55" width="265" height="130" rx="18" fill="#f3f4f6" stroke="#6b7a90" stroke-width="3"/>
+					<text x="1042" y="103" font-size="29" font-weight="700" fill="#1a2f4a">C 実装の標準関数</text>
+					<text x="1042" y="147" font-size="24">検索・比較などを実行</text>
+
+					<path d="M315,218 V242 H855 V218" fill="none" stroke="#134aa9" stroke-width="4"/>
+					<text x="585" y="286" font-size="29" font-weight="700" fill="#134aa9">JIT ON で最適化される範囲</text>
+					<path d="M910,218 V242 H1175 V218" fill="none" stroke="#6b7a90" stroke-width="4"/>
+					<text x="1042" y="286" font-size="27" font-weight="700" fill="#6b7a90">JIT の対象外</text>
+					<text x="600" y="346" font-size="34" font-weight="700" fill="#1a2f4a">C 実装の本体処理は、JIT ON / OFF で変わらない</text>
+				</g>
+			</svg>
+			<p>標準関数に JIT は <span style="color: #c00;">効果がない</span>のか？</p>
 		</section>
 		<section>
-			<p>標準関数に JIT は <span style="color: #c00; font-size: 1.5em;">効果がない</span>のか？</p>
-			<p>標準関数でも JIT の恩恵を受ける関数も<span style="font-size:1.5em; color: #134aa9;font-weight:700;">ちゃんとある</span></p>
-		</section>
-		<section>
-			<p>JIT の恩恵を受ける標準関数群</p>
+			<h2>JIT の恩恵を受ける標準関数群</h2>
+			<p>一部の関数は JIT の恩恵を受ける</p>
 			<ol>
 				<li>コールバックを受け取る関数群</li>
 				<li>専用 OPECODE を持つ関数</li>
@@ -336,15 +389,18 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 		</section>
 
 		<section>
-			<h2>計測結果</h2>
-			<p>JIT ON の方が速度アップ</p>
-			<table class="compare-table">
-				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
+			<h2>計測結果：Collection vs 配列</h2>
+			<p class="small">100回分（基準ループ差引後の推定値）</p>
+			<table class="compare-table dense benchmark-result-table">
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>１回あたり</th></tr></thead>
 				<tbody>
-					<tr><td>array_map</td><td>105.7μs</td><td style="color:#134aa9;font-weight:700;">86.8μs</td><td style="color:#134aa9;font-weight:700;">88.9μs</td></tr>
-					<tr><td>usort</td><td>2.051ms</td><td style="color:#134aa9;font-weight:700;">1.714ms</td><td style="color:#134aa9;font-weight:700;">1.740ms</td></tr>
+					<tr><td>Collection</td><td>11,356.5μs</td><td class="key">9,643.3μs</td><td class="key">9,543.3μs</td><td>113,564.9 / 95,432.8 ns</td></tr>
+					<tr><td>素の配列</td><td>1,913.3μs</td><td class="key">380.6μs</td><td class="key">379.5μs</td><td>19,132.9 / 3,794.9 ns</td></tr>
+					<tr><td>配列関数</td><td>5,314.4μs</td><td class="key">4,638.6μs</td><td class="key">4,617.3μs</td><td>53,144.2 / 46,172.5 ns</td></tr>
 				</tbody>
 			</table>
+			<p class="small">１回あたり：最大値 / 最小値</p>
+			<p>JIT はコールバック内にも効くが、<span class="key">素の PHP ループ</span>ほど大きく短縮</p>
 		</section>
 		<section>
 			<h2>2. 専用 OPCODE を持つ関数</h2>
@@ -420,19 +476,17 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 
 		<section>
 			<h2>計測結果：PCRE JIT</h2>
-			<table class="compare-table dense">
-				<thead><tr><th>処理</th><th>PCRE JIT OFF</th><th>PCRE JIT ON</th></tr></thead>
+			<p class="small">1計測関数 = <code>preg_*</code> を2,000回実行</p>
+			<table class="compare-table dense benchmark-result-table">
+				<thead><tr><th>処理</th><th>PCRE JIT OFF</th><th>PCRE JIT ON</th><th>１回あたり</th></tr></thead>
 				<tbody>
-					<tr><td style="white-space:nowrap">preg_match</td><td>47.609ms</td><td style="color:#134aa9;font-weight:700;">6.049ms</td></tr>
-					<tr><td style="white-space:nowrap">preg_match_all</td><td>76.145ms</td><td style="color:#134aa9;font-weight:700;">9.568ms</td></tr>
-					<tr><td style="white-space:nowrap">preg_replace_callback</td><td>76.026ms</td><td style="color:#134aa9;font-weight:700;">10.133ms</td></tr>
+					<tr><td>preg_match</td><td>47.609ms</td><td class="key">6.049ms</td><td>23.8 / 3.0 μs</td></tr>
+					<tr><td>preg_match_all</td><td>76.145ms</td><td class="key">9.568ms</td><td>38.1 / 4.8 μs</td></tr>
+					<tr><td>preg_replace_callback</td><td>76.026ms</td><td class="key">10.133ms</td><td>38.0 / 5.1 μs</td></tr>
 				</tbody>
 			</table>
+			<p class="small">１回あたり：最大値 / 最小値</p>
 			<p>PCRE JIT で<span class="key">約 7.5〜8.0 倍高速</span></p>
-		</section>
-
-		<section class="lead-bridge">
-			<p>とはいえ標準関数への効果は限定的<br>ユーザー定義コードならどれくらい効果が上がるのか</p>
 		</section>
 
 		<!-- ============================================================ -->
@@ -440,6 +494,7 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 		<!-- ============================================================ -->
 		<section class="section-divider">
 			<h2>ユーザー定義コードの計測</h2>
+			<p>とはいえ効果が出る標準関数は限定的</p>
 			<p>普段書くコードに、どこまで JIT の効果がでるのかを計測していきます</p>
 			<p>・四則演算</p>
 			<p>・ループ</p>
@@ -453,17 +508,22 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 		</section>
 		<section>
 			<h2>計測結果</h2>
-			<p>加減乗は JIT で<span class="key">約 3.7〜3.8 倍高速</span></p>
-			<p>一方、除算は JIT を有効にしても、CPU の演算コストが上回り、遅くなる結果に<br>いろんなパターンを試すも、除算は安定せず...</p>
-			<table class="compare-table dense">
-				<thead><tr><th>処理</th><th>JIT OFF</th><th>JIT function</th><th>JIT tracing</th></tr></thead>
+			<p class="small">1関数 = 1万回の演算</p>
+			<table class="compare-table dense benchmark-result-table">
+				<thead><tr><th>処理</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>１演算あたり</th></tr></thead>
 				<tbody>
-					<tr><td>加算（+）</td><td>42.685μs</td><td class="key">11.311μs</td><td class="key">11.329μs</td></tr>
-					<tr><td>減算（−）</td><td>42.452μs</td><td class="key">11.312μs</td><td class="key">11.298μs</td></tr>
-					<tr><td>乗算（×）</td><td>42.427μs</td><td class="key">11.343μs</td><td class="key">11.238μs</td></tr>
-					<tr><td>除算（÷）</td><td>84.799μs</td><td class="worse">88.079μs</td><td class="worse">88.184μs</td></tr>
+					<tr><td>加算（+）</td><td>42.756μs</td><td class="key">11.311μs</td><td class="key">11.240μs</td><td>4.3 / 1.1 ns</td></tr>
+					<tr><td>減算（−）</td><td>42.619μs</td><td class="key">11.364μs</td><td class="key">11.301μs</td><td>4.3 / 1.1 ns</td></tr>
+					<tr><td>乗算（×）</td><td>42.461μs</td><td class="key">11.321μs</td><td class="key">11.333μs</td><td>4.2 / 1.1 ns</td></tr>
+					<tr><td>浮動小数点除算</td><td>85.217μs</td><td class="worse">88.022μs</td><td class="worse">88.333μs</td><td>8.8 / 8.5 ns</td></tr>
+					<tr><td>整数除算</td><td>145.210μs</td><td class="key">89.204μs</td><td class="key">89.139μs</td><td>14.5 / 8.9 ns</td></tr>
 				</tbody>
 			</table>
+			<p class="small">１演算あたり：最大値 / 最小値（ループ込み）</p>
+		</section>
+		<section>
+			<p>加減乗は JIT で<span class="key">約 3.7〜3.8 倍高速</span></p>
+			<p>一方、除算は JIT を有効にしても、CPU の演算コストが上回り、遅くなる結果に<br>いろんなパターンを試すも、除算は安定せず...</p>
 		</section>
 
 		<section>
@@ -487,18 +547,20 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 		<section>
 			<h2>単純比較にも JIT は効く</h2>
 			<p class="small">厳密比較は単純判定でも大きく短縮<br>計算結果の match は伸びが小さい</p>
-			<table class="compare-table dense">
-				<thead><tr><th>判定</th><th>JIT OFF</th><th>function</th><th>tracing</th></tr></thead>
+			<p class="small">1万回分（基準処理差引後の推定値）</p>
+			<table class="compare-table dense benchmark-result-table">
+				<thead><tr><th>判定</th><th>JIT OFF</th><th>function</th><th>tracing</th><th>１回あたり</th></tr></thead>
 				<tbody>
-					<tr><td>単純 if <code>==</code></td><td>61.3μs</td><td>32.7μs</td><td>34.2μs</td></tr>
-					<tr><td>単純 if <code>===</code></td><td>15.6μs</td><td class="key">3.4μs</td><td class="key">4.8μs</td></tr>
-					<tr><td>単純 switch</td><td>81.9μs</td><td>41.2μs</td><td>42.3μs</td></tr>
-					<tr><td>単純 match</td><td>23.3μs</td><td class="key">2.8μs</td><td class="key">3.5μs</td></tr>
-					<tr><td>計算結果 if</td><td>44.1μs</td><td class="key">9.6μs</td><td class="key">7.6μs</td></tr>
-					<tr><td>計算結果 switch</td><td>37.5μs</td><td class="key">7.6μs</td><td class="key">7.5μs</td></tr>
-					<tr><td>計算結果 match</td><td>107.2μs</td><td>85.9μs</td><td>86.0μs</td></tr>
+					<tr><td>単純 if <code>==</code></td><td>61.3μs</td><td>32.7μs</td><td>34.2μs</td><td>6.1 / 3.3 ns</td></tr>
+					<tr><td>単純 if <code>===</code></td><td>15.6μs</td><td class="key">3.4μs</td><td class="key">4.8μs</td><td>1.6 / 0.3 ns</td></tr>
+					<tr><td>単純 switch</td><td>81.9μs</td><td>41.2μs</td><td>42.3μs</td><td>8.2 / 4.1 ns</td></tr>
+					<tr><td>単純 match</td><td>23.3μs</td><td class="key">2.8μs</td><td class="key">3.5μs</td><td>2.3 / 0.3 ns</td></tr>
+					<tr><td>計算結果 if</td><td>44.1μs</td><td class="key">9.6μs</td><td class="key">7.6μs</td><td>4.4 / 0.8 ns</td></tr>
+					<tr><td>計算結果 switch</td><td>37.5μs</td><td class="key">7.6μs</td><td class="key">7.5μs</td><td>3.8 / 0.8 ns</td></tr>
+					<tr><td>計算結果 match</td><td>107.2μs</td><td>85.9μs</td><td>86.0μs</td><td>10.7 / 8.6 ns</td></tr>
 				</tbody>
 			</table>
+			<p class="small">１回あたり：最大値 / 最小値</p>
 			
 		</section>
 
@@ -516,10 +578,7 @@ final class Money {
     public function multiply(int $f): self { return new self($this->amount * $f); }
 }
 			</code></pre>
-			<ol>
-				<li>ミュータブル</li>
-				<li>イミュータブル</li>
-			</ol>
+			<p>1. ミュータブル<br>2. イミュータブル</p>
 			<p>この２つでどれだけ JIT が効くのか、<br>どれだけ差が出るのかを計測</p>
 		</section>
 		<section>

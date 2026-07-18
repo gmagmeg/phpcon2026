@@ -54,22 +54,6 @@ class CollectionHotLoopBench extends LaravelBench
         }
     }
 
-    /** Collection パイプラインを含むホットループ全体 */
-    public function benchCollectionPipelineHotLoop(): void
-    {
-        $total = 0;
-        $datasets = $this->datasets;
-
-        for ($i = 0; $i < self::LOOP_COUNT; $i++) {
-            $total += collect($datasets[$i])
-                ->map(fn ($n) => $n * 2)
-                ->filter(fn ($n) => $n % 3 === 0)
-                ->sum();
-        }
-
-        $this->sink = $total;
-    }
-
     /** 素の配列処理を含むホットループ全体 */
     public function benchRawArrayHotLoop(): void
     {
