@@ -34,7 +34,7 @@ use PhpBench\Attributes as Bench;
 #[Bench\Iterations(5)]
 class CartCheckoutTypedLeanBench
 {
-    private const N = 5000;
+    private const N = 10000;
     private const LINES_PER_CART = 4;
 
     private const FREE_THRESHOLD = 8000;
