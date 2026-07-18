@@ -46,15 +46,6 @@ class CallbackBench
         }, $this->data);
     }
 
-    /** 同じ処理を手書き foreach（コールバックなし・完全 userland） */
-    public function benchManualLoop(): void
-    {
-        $out = [];
-        foreach ($this->data as $n) {
-            $out[] = $n * 1.5 + $n - ($n / 3.0);
-        }
-    }
-
     /** usort：比較コールバックを O(n log n) 回呼ぶ（userland） */
     public function benchUsort(): void
     {

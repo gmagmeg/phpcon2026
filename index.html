@@ -476,17 +476,17 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 
 		<section>
 			<h2>計測結果：PCRE JIT</h2>
-			<p class="small">1計測関数 = <code>preg_*</code> を2,000回実行</p>
+			<p class="small">1計測関数 = <code>preg_*</code> を10,000回実行</p>
 			<table class="compare-table dense benchmark-result-table">
 				<thead><tr><th>処理</th><th>PCRE JIT OFF</th><th>PCRE JIT ON</th><th>１回あたり</th></tr></thead>
 				<tbody>
-					<tr><td>preg_match</td><td>47.609ms</td><td class="key">6.049ms</td><td>23.8 / 3.0 μs</td></tr>
-					<tr><td>preg_match_all</td><td>76.145ms</td><td class="key">9.568ms</td><td>38.1 / 4.8 μs</td></tr>
-					<tr><td>preg_replace_callback</td><td>76.026ms</td><td class="key">10.133ms</td><td>38.0 / 5.1 μs</td></tr>
+					<tr><td>preg_match</td><td>190.228ms</td><td class="key">23.524ms</td><td>19.0 / 2.4 μs</td></tr>
+					<tr><td>preg_match_all</td><td>307.039ms</td><td class="key">37.144ms</td><td>30.7 / 3.7 μs</td></tr>
+					<tr><td>preg_replace_callback</td><td>302.597ms</td><td class="key">39.270ms</td><td>30.3 / 3.9 μs</td></tr>
 				</tbody>
 			</table>
 			<p class="small">１回あたり：最大値 / 最小値</p>
-			<p>PCRE JIT で<span class="key">約 7.5〜8.0 倍高速</span></p>
+			<p>PCRE JIT で<span class="key">約 7.7〜8.3 倍高速</span></p>
 		</section>
 
 		<!-- ============================================================ -->
