@@ -39,6 +39,7 @@ jobs:
               benchmarks/InArrayHotLoopBench.php
               benchmarks/BcmathBench.php
               benchmarks/CallbackBench.php
+              benchmarks/CallbackHotLoopBench.php
             shell: ""
           # ── Laravel：フレームワーク層 / OPcache の効きどころ ──
           - category: laravel
