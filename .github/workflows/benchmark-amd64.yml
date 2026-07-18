@@ -48,6 +48,7 @@ jobs:
               benchmarks/EloquentPropertyBench.php
               benchmarks/ContainerResolveBench.php
               benchmarks/CollectionBench.php
+              benchmarks/CollectionHotLoopBench.php
               benchmarks/StrBench.php
             shell: "bench/laravel_boot_bench.sh bench/thin_bench.sh"
           # ── DDD：型付き VO / ドメインロジック / 多態 ──
