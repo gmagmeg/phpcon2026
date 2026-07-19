@@ -1,0 +1,75 @@
+name: Benchmark OPcache capacity
+
+# OPcache の通常設定と、容量・ファイル数を最小値にした制限設定を比較する専用 Workflow。
+# PHP-FPM + nginx で Laravel Welcome / 36依存 / 400ファイル圧迫を実測し、
+# cache_full や cached_keys も Job Summary に出力する。
+# 手動実行: Actions → Benchmark OPcache capacity → Run workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "各条件の計測回数"
+        required: true
+        type: number
+        default: 30
+      warmups:
+        description: "各条件のウォームアップ回数"
+        required: true
+        type: number
+        default: 5
+      pressure_files:
+        description: "キャッシュ圧迫用のPHPファイル数"
+        required: true
+        type: number
+        default: 400
+
+concurrency:
+  group: benchmark-opcache-capacity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: OPcache capacity (${{ inputs.runs }} runs)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: laravel
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CPU / arch info
+        run: |
+          echo "arch: $(uname -m)"
+          lscpu | grep -E 'Architecture|Model name|^CPU\(s\)|MHz' || true
+
+      - name: Build Laravel app image
+        run: docker compose build app
+
+      - name: Run OPcache capacity benchmark
+        env:
+          IMG: performance-php-app
+          RUNS: ${{ inputs.runs }}
+          WARMUPS: ${{ inputs.warmups }}
+          PRESSURE_FILES: ${{ inputs.pressure_files }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## OPcache dependency / capacity benchmark"
+            echo ""
+            echo "- Runner: \`ubuntu-latest ($(uname -m))\`"
+            echo "- CPU: \`$(lscpu | awk -F: '/Model name/{print $2; exit}' | xargs)\`"
+            echo "- Runs: \`${RUNS}\` per endpoint"
+            echo "- Warmups: \`${WARMUPS}\` per endpoint"
+            echo "- Pressure files: \`${PRESSURE_FILES}\`"
+            echo ""
+            echo '```text'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          sh bench/opcache_capacity_bench.sh \
+            "$IMG" "$RUNS" "$WARMUPS" "$PRESSURE_FILES" \
+            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

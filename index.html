@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-<title>JIT と OPcache を「正しく」期待する ― PHP 高速化の効きどころ</title>
+<title>OPcache と JIT で PHP はどこまで速くなる？ ― 実測で見極める高速化の効きどころ</title>
 
 <link rel="stylesheet" href="dist/reveal.css">
 <link rel="stylesheet" href="dist/theme/white.css">
@@ -22,8 +22,8 @@
 
 		<!-- ===== タイトル ===== -->
 		<section class="title-slide" data-background-color="#0b1f3a">
-			<h1>JIT と OPcache を<br>「正しく」期待する</h1>
-			<p class="small">― PHP 高速化の効きどころ ―</p>
+			<h1>OPcache と JIT で<br>PHP はどこまで<br>速くなる？</h1>
+			<p class="small">― 標準関数・Laravel・実践コードで徹底計測 ―</p>
 			<p class="small">ma_me / PHP Conference Japan 2026</p>
 		</section>
 
@@ -32,13 +32,9 @@
 		<!-- イントロ / 前提合わせ -->
 		<!-- ============================================================ -->
 		<section class="goal-slide">
-			<h2>このセッションのゴール</h2>
-			OPcache、JIT が
-			<ul class="emph-middle-list">
-						<li>それぞれどこに効くのかを<br>計測して<br>数字で見て<br>理解する</li>
-						<li>効く / 効かないを<br>ある程度、予測できるようになる</li>
-						<li>導入したけれど<br>早くならない、早くなったかわからない<br>をなくす</li>
-					</ul>
+			<h2>このセッションの目的</h2>
+			OPcache、JIT がそれぞれどこに効くのかを
+			<p>計測して</p><p>数字で見て</p><p>理解する</p>
 		</section>
 
 		<!-- ============================================================ -->
@@ -131,6 +127,7 @@
 		</section>
 
 		<section>
+			<h2>OPcache の計測</h2>
 			<p>まずは OPcache がどこに効いて<br>どこまで速くなるのか<br>作って・測って・確かめてみる</p>
 		</section>
 
