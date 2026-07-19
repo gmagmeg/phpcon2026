@@ -144,7 +144,7 @@
 		</section>
 
 		<section>
-			<p>OPcache の効くところはシンプル<br>効果は<span class="ok mark" style="font-size:1.5em;">コード量（コンパイル対象の規模）</span><br>にほぼ比例</p>
+			<p>OPcache の効くところはシンプル<br>効果は<span class="ok mark" style="font-size:1.5em;">コード量</span>（コンパイル対象の規模）<br>にほぼ比例</p>
 			<div class="checklist">
 				<p class=""><span class="ok mark" style="font-size:1.5em;">↑</span><span class="ok" style="font-weight: bold; font-size:1.5em;">効果あり：大量のクラス/ファイル</span></p>
 				<p class=""><span class="ng mark" style="font-size:1.5em;">↓</span><span class="ng" style="font-weight: bold; font-size:1.5em;">効果なし or 薄い：薄いスクリプト群</span></p>
@@ -163,44 +163,81 @@
 		</section>
 
 		<section>
-			<h2>Laravel Welcome 計測結果</h2>
-			<p class="small">1 リクエストで 525 ファイルを読み込み、516 クラスを宣言</p>
-			<table class="compare-table">
+			<h2>Laravel 計測結果</h2>
+			<p class="small"> 500 ファイル / リクエストを読み込み</p>
+			<table>
 				<thead>
 					<tr><th>OPcache</th><th>平均 / 1リクエスト</th><th>OFF との比較</th></tr>
 				</thead>
 				<tbody>
-					<tr><td>OFF</td><td>68.71 ms</td><td>基準</td></tr>
-					<tr class="highlight"><td>ON</td><td>42.43 ms</td><td>26.28 ms 短縮<br>1.62 倍</td></tr>
+					<tr><td>OFF</td><td>68.71 ms</td><td>ー</td></tr>
+					<tr class="highlight"><td>ON</td><td>42.43 ms</td><td> <span class="key" style="font-size: 1.2em;">約 26 ms</span> 短縮</td></tr>
 				</tbody>
 			</table>
-			<p class="small">PHP 8.5.8 / x86_64 / 30 回平均 / request モード / JIT 無効<br>ON は OPcache file cache をウォームアップ後に計測</p>
+			
+			<p class="small">5000ファイル</p>
+			<table>
+				<thead>
+					<tr><th>OPcache</th><th>平均 / 1リクエスト</th><th>OFF との比較</th></tr>
+				</thead>
+				<tbody>
+					<tr><td>OFF</td><td>83.142 ms</td><td>ー</td></tr>
+					<tr class="highlight"><td>ON</td><td>10.112 ms</td><td> <span class="key" style="font-size: 1.2em;">約 70 ms</span> 短縮</td></tr>
+				</tbody>
+			</table>
+		</section>
+
+		<section class="" style="display:flex!important;flex-direction:column;justify-content:center;align-items:center;min-height:100%;text-align:center">
+			<p>読み込みファイルが多いほど <span class="answer" style="font-size: 1.5em;">効果：大 ⤴︎</span></p>
+			<p>ファイル数が多くなる、フレームワークと相性抜群</p>
+			<img src="images/laravel-logomark.svg" alt="Laravel" style="height:200px;width:auto">
 		</section>
 
 		<section>
+			<h2>注意点：キャッシュ領域をちゃんと取ってあげる</h2>
+			<p>キャッシュ領域が足りないと性能がダウンする</p>
+			<table style="font-size:.52em;margin-bottom:.35em;">
+				<thead>
+					<tr>
+						<th>設定</th>
+						<th>計測値</th>
+						<th>差分</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr>
+						<td>OFF</td>
+						<td style="white-space:nowrap">83.142 ms</td>
+						<td>ー</td>
+					</tr>
+
+					<tr>
+						<td class="worse" style="white-space:nowrap">ON（8MB。不足）</td>
+						<td class="worse" style="white-space:nowrap">61.680 ms</td>
+						<td class="worse" style="white-space:nowrap"><span class="key">基準より約 20ms UP</span><br><span class="key-red">24MB より約 50 msダウン</span></td>
+					</tr>
+										<tr class="highlight">
+						<td style="white-space:nowrap">ON（32MB）</td>
+						<td style="white-space:nowrap">10.112 ms</td>
+						<td style="white-space:nowrap"><span class="key">基準より約 70ms UP</span><br><span class="key">24MB より約 50 msアップ</span></td>
+					</tr>
+				</tbody>
+			</table>		</section>
+
+		<section>
 			<h2>逆効果パターン</h2>
-			<p>薄いスクリプトの寄せ集め<br>関数 1 個だけの極小ファイルを N 個 require する</p>
+			<p>ファイル数が多くても<br>関数 1 個だけの極小ファイルを<br>大量に読み込むケースでは逆効果</p>
 			<pre style="font-size:.52em"><code data-trim data-noescape class="language-php">
-/**
- * 関数1個だけの極小ファイルを N 個生成
- */
-for ($i = 0; $i &lt; $n; $i++) {
-    file_put_contents("thin_{$i}.php", /* 関数1個だけの PHP コード */);
-}
-
-// 読み込み
-$t0 = hrtime(true);
-for ($i = 0; $i &lt; $n; $i++) {
-    require "thin_{$i}.php";   // OFF: 毎回コンパイル / ON: file_cache から読むだけ
-}
-
-echo (hrtime(true) - $t0) / 1e6, " ms\n";
+require "1.php";
+require "2.php";
+・・・
 			</code></pre>
 		</section>
 
 		<section>
 			<h2>薄いスクリプト計測結果</h2>
-			<p>全条件で OPcache ON の方が遅い</p>
+			<p>全条件で OPcache ON の方が遅い。<br>キャッシュ作成コストが上回ったパターン。</p>
+			<p class="small">関数 1 個だけの PHP ファイルを50個読み込み</p>
 			<table class="compare-table dense">
 				<thead>
 					<tr><th>require数</th><th>OPcache OFF</th><th>OPcache ON</th><th>差（ON − OFF）</th></tr>
@@ -211,20 +248,10 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 					<tr><td>500</td><td>7.033 ms</td><td class="worse">12.453 ms</td><td class="worse">+5.420 ms</td></tr>
 				</tbody>
 			</table>
-			<p class="small">PHP 8.5.8 / x86_64 / 各 30 回平均 / JIT 無効<br>関数 1 個だけの極小 PHP ファイルを別プロセスで実行</p>
-		</section>
-
-		<section class="center-punch">
-			<p>OPcache が効く部分の復習</p>
-			<img class="concept-svg" src="images/opcache-flow.svg" style="max-width:760px;max-height:60vh;margin-top:0.3em"
-				alt="OPcache の効くところ：初回はコンパイルして OPCODE をメモリにキャッシュし、2回目以降はコンパイル〜OPCODE 生成をまるごとスキップしてキャッシュから実行する">
 		</section>
 
 
-		<section class="" style="display:flex!important;flex-direction:column;justify-content:center;align-items:center;min-height:100%;text-align:center">
-			<p>コード量＋ファイルが多いフレームワークで利用すると<br><span class="answer" style="font-size: 2em;">効果：大 ⤴︎</span></p>
-			<img src="images/laravel-logomark.svg" alt="Laravel" style="height:200px;width:auto">
-		</section>
+		
 		<section>
 			<h2>設定値で気をつけること</h2>
 				<p>・Web アプリケーション：Opcache は初期設定で ON</p>
@@ -233,6 +260,12 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 								<pre><code>php artisan queue:work</code></pre>
 				</p>
 			<p>
+		</section>
+
+		<section>
+			Laravelなど フレームワークを使った開発であれば<br>
+			恩恵に預かれる。基本的には ON にしておく。<br>
+			（公式も ON にしてくれている）
 		</section>
 		<!-- ============================================================ -->
 		<!-- 第2章 JIT の効果計測 ― 意外な結果から原則を見つける -->
@@ -244,10 +277,12 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 		<section>
 			<h2>JIT（Just-in-Time） の概要</h2>
 			<ul class="emph-middle-list">
+				<li>PHP には Opchache と PCRE にそれぞれ備え付けられている</li>
 				<li>必要なものを、必要な時に、必要なだけ作る<br>＝必要でなければ<span class="key">作られない</span></li><li>キャッシュした <span class="key">OPCODE を<br>ネイティブ機械語</span>に変換して実行</li>
 				<li>Zend VM を介さず CPU が直接走るため<br><span class="key">計算ヘビーな処理</span>ほど効きやすい</li>
 			</ul>
 		</section>
+
 		<section>
 			<h2>JIT が導入された目的</h2>
 			<p>PHP コードを機械語化し、実行コストを下げる。<br>
@@ -264,6 +299,25 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 				<li><span class="key">ARM64</span>（AArch64 / Apple Silicon 等）</li>
 			</ul>
 			<p>同じコードでも結果に差異が出るので<br> JIT の計測をするときは要注意</p>
+		</section>
+
+		<section>
+			<h2><code>function</code> と <code>tracing</code></h2>
+			<ul style="font-size:1.5em;">
+				<li>
+					<code>function</code><br>
+					<span class="key">関数全体</span>をひとまとまりとして、機械語へコンパイル
+				</li>
+				<li>
+					<code>tracing</code><br>
+					実行時に<span class="key">頻繁に通る経路</span>を見つけ、<br>トレース単位でコンパイル
+				</li>
+			</ul>
+			<p class="small">前述した CPU アーキテクチャでは特に差が出た部分<br>
+				ARM64 では<br> function が tracing より遅くなる傾向がありました<br>
+				(スペースの都合上、結果は載せていません)
+
+			</p>
 		</section>
 
 		<section>
@@ -286,7 +340,7 @@ echo (hrtime(true) - $t0) / 1e6, " ms\n";
 
 
 		<section class="center-punch">
-			<p>JIT が効く箇所</p>
+			<p>OPchace.JIT が効く箇所</p>
 			<img class="concept-svg" src="images/jit-flow.svg" style="max-width:1040px;max-height:62vh;margin-top:0.3em"
 				alt="JIT が効くところ：OPcache 上の OPCODE を JIT が機械語化し、Zend VM を介さず CPU が直接機械語を実行する">
 		</section>
@@ -322,7 +376,7 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 				</tbody>
 			</table>
 			<p class="small">１回あたり：最大値 / 最小値</p>
-			<p>ほぼ変わらない...?array_key_exists に関しては悪化傾向にd</p>
+			<p>ほぼ変わらない...?<br>array_key_exists に関しては悪化傾向に</p>
 		</section>
 		<section>
 			<h2>標準関数の呼び出しフロー</h2>
@@ -360,13 +414,14 @@ isset($keys[10000]);               // 1 回のハッシュ参照
 					<text x="1042" y="147" font-size="24">検索・比較などを実行</text>
 
 					<path d="M315,218 V242 H855 V218" fill="none" stroke="#134aa9" stroke-width="4"/>
-					<text x="585" y="286" font-size="29" font-weight="700" fill="#134aa9">JIT ON で最適化される範囲</text>
+					<text x="585" y="286" font-size="38" font-weight="700" fill="#134aa9">JIT ON で最適化される範囲</text>
 					<path d="M910,218 V242 H1175 V218" fill="none" stroke="#6b7a90" stroke-width="4"/>
-					<text x="1042" y="286" font-size="27" font-weight="700" fill="#6b7a90">JIT の対象外</text>
-					<text x="600" y="346" font-size="34" font-weight="700" fill="#1a2f4a">C 実装の本体処理は、JIT ON / OFF で変わらない</text>
+					<text x="1042" y="286" font-size="38" font-weight="700" fill="#6b7a90">JIT の対象外</text>
+					<text x="600" y="356" font-size="48" font-weight="700" fill="#1a2f4a">C 実装の本体処理は、JIT ON / OFF で変わらない</text>
 				</g>
 			</svg>
-			<p>標準関数に JIT は <span style="color: #c00;">効果がない</span>のか？</p>
+			<p>計算量が絡むのは C 実装側で JIT の<span class="key-red">対象外</span></p>
+			<p>JIT では標準関数の速度差を縮められない。<br><span class="key-red">効果がない</span>のか？</p>
 		</section>
 		<section>
 			<h2>JIT の恩恵を受ける標準関数群</h2>
@@ -680,51 +735,35 @@ $total      = $discounted-&gt;add($shipping);           // ← new
 			<p class="small">１件あたり：最大値 / 最小値</p>
 			<p>JIT で イミュータブルは約 <span class="key">6ms</span><br>イミュータブルは約 <span class="key">3ms</span> の削減</p>
 		</section>
+
 		<section>
-			ここまでの計測結果を踏まえ JIT は ON にした方がいいのか？
-		</section>
-		<section>
-			<h2>結論<h2>
-			<p>無理に適用しなくてもいいかなー。。。</p>
-			<p>色々な設定値を変えても、ns レベルの変化しかなかった</p>
-		</section>
-		<section>
-			<h2>OPcache / JIT の既定値</h2>
-			<table class="compare-table dense" style="font-size:.72em;">
-				<thead>
-					<tr><th>対象</th><th>代表的な設定</th><th>デフォルト</th></tr>
-				</thead>
-				<tbody>
-					<tr><td>OPcache（Web）</td><td><code>opcache.enable</code></td><td><code>1</code>（ON）</td></tr>
-					<tr><td>OPcache（CLI）</td><td><code>opcache.enable_cli</code></td><td><code>0</code>（OFF）</td></tr>
-					<tr><td>JIT</td><td><code>opcache.jit</code></td><td><code>disable</code>（OFF）</td></tr>
-					<tr><td>JIT バッファ</td><td><code>opcache.jit_buffer_size</code></td><td><code>64M</code></td></tr>
-					<tr><td>正規表現 JIT</td><td><code>pcre.jit</code></td><td><code>1</code>（ON）</td></tr>
-				</tbody>
-			</table>
-			<p class="small">PHP 8.5：<code>pcre.jit</code> は PHP 本体の JIT とは別機能</p>
-		</section>
-		<section>
-			<ul>
-				<li style="font-size: 1.5em;">効果の高かったOpcache：ON</li>
-				<li style="font-size: 1.5em;">一番効果の高かった正規表現 JIT：ON</li>
-				<li style="font-size: 1.5em;">Opcache.JIT：OFF</li>
-			</ul>
-			<p>すでに最適化されている、デフォルト設定</p>
+			<h2>ここまでの計測結果を踏まえての感想<h2>
+			<p>OPchache.jit は無理に適用しなくてもいいかなー。。。</p>
+			<p>色々な設定値を変えても、ns レベルの変化しかなかった or 遅くなってしまった...</p>
 		</section>
 
 		<section>
-			<h2>JIT ON にするときの注意点</h2>
-			<h3>必ず計測する</h3>
-			コード・実行量によっては JIT の実行コストが<span class="key-red">上回ってしまう</span>ことがある
+			<h2>諸々の計測を終えての感想</h2>
+			<p>このような設定値になっていれば理想</p>
+			<ul>
+				<li style="font-size: 1.25em;">効果の高かった Opcache：ON</li>
+				<li style="font-size: 1.25em;">一番効果の高かった正規表現の PCRE.JIT：ON</li>
+				<li style="font-size: 1.25em;">使い所の難しい Opcache.JIT：OFF</li>
+			</ul>
 		</section>
+
 		<section>
-			<h2>謝罪</h2>
-			<blockquote>
-				<p>PHP 8.0 で導入された OPcache と JIT は、現在も改善が続いています。</p>
-				<p>その一方で、両方ともデフォルト設定のまま運用しているケースは多々あり、それぞれの特性を活かせていると言い切れる現場も多くないはずです。</p>
-			</blockquote>
-			デフォルトが最適でした。<br>PHP 公式ありがとう
+			<h2>PHP の<br>OPcache / JIT の既定値</h2>
+			<ul>
+				<li style="font-size: 1.25em;">Opcache：ON</li>
+				<li style="font-size: 1.25em;">正規表現 PCRE.JIT：ON</li>
+				<li style="font-size: 1.25em;">Opcache.JIT：OFF</li>
+			</ul>
+		</section>
+
+		<section>
+			すでになっていました。<br>
+			<span class="key">デフォルトが最適!</span><br>PHP 公式ありがとう...!
 		</section>
 
 		<section class="center-punch">
