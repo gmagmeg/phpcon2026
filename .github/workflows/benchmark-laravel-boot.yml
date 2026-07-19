@@ -1,0 +1,70 @@
+name: Benchmark Laravel boot (OPcache)
+
+# Laravel Welcome ページの boot/request 計測だけを実行する専用 Workflow。
+# GitHub Actions の x86_64 環境で OPcache OFF / ON を比較する。
+# 手動実行: Actions → Benchmark Laravel boot (OPcache) → Run workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "各条件の計測回数"
+        required: true
+        type: number
+        default: 30
+      mode:
+        description: "計測範囲"
+        required: true
+        type: choice
+        options:
+          - request
+          - boot
+        default: request
+
+concurrency:
+  group: benchmark-laravel-boot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: Laravel boot (${{ inputs.mode }}, ${{ inputs.runs }} runs)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: laravel
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CPU / arch info
+        run: |
+          echo "arch: $(uname -m)"
+          lscpu | grep -E 'Architecture|Model name|^CPU\(s\)|MHz' || true
+
+      - name: Build Laravel app image
+        run: docker compose build app
+
+      - name: Run Laravel boot benchmark
+        env:
+          IMG: performance-php-app
+          RUNS: ${{ inputs.runs }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## Laravel boot benchmark — OPcache OFF / ON"
+            echo ""
+            echo "- Runner: \`ubuntu-latest ($(uname -m))\`"
+            echo "- CPU: \`$(lscpu | awk -F: '/Model name/{print $2; exit}' | xargs)\`"
+            echo "- Mode: \`${MODE}\`"
+            echo "- Runs: \`${RUNS}\` per condition"
+            echo ""
+            echo '```text'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          docker run --rm "$IMG" \
+            sh bench/laravel_boot_bench.sh "$RUNS" "$MODE" \
+            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

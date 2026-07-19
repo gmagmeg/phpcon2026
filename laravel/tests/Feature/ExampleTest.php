@@ -16,4 +16,13 @@ class ExampleTest extends TestCase
 
         $response->assertStatus(200);
     }
+
+    public function test_dependency_heavy_welcome_resolves_all_dependencies(): void
+    {
+        $response = $this->get('/perf/dependency-heavy');
+
+        $response
+            ->assertOk()
+            ->assertHeader('X-Benchmark-Checksum', '666');
+    }
 }

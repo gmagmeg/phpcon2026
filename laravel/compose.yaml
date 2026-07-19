@@ -19,6 +19,8 @@ services:
       OPCACHE_JIT: "${OPCACHE_JIT:-tracing}"
       OPCACHE_JIT_BUFFER_SIZE: "${OPCACHE_JIT_BUFFER_SIZE:-128M}"
       OPCACHE_MEMORY: "${OPCACHE_MEMORY:-256}"
+      OPCACHE_INTERNED_STRINGS_BUFFER: "${OPCACHE_INTERNED_STRINGS_BUFFER:-16}"
+      OPCACHE_MAX_FILES: "${OPCACHE_MAX_FILES:-20000}"
     volumes:
       # ソースをマウントしてコード変更を即反映（検証サイクルを速く）
       - ./:/app
@@ -42,6 +44,8 @@ services:
       OPCACHE_JIT: "${OPCACHE_JIT:-tracing}"
       OPCACHE_JIT_BUFFER_SIZE: "${OPCACHE_JIT_BUFFER_SIZE:-128M}"
       OPCACHE_MEMORY: "${OPCACHE_MEMORY:-256}"
+      OPCACHE_INTERNED_STRINGS_BUFFER: "${OPCACHE_INTERNED_STRINGS_BUFFER:-16}"
+      OPCACHE_MAX_FILES: "${OPCACHE_MAX_FILES:-20000}"
     volumes:
       - ./:/app
     restart: unless-stopped

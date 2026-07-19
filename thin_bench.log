@@ -1,0 +1,41 @@
+
+   INFO  Application key set successfully.  
+
+[entrypoint] OPcache=1 JIT=tracing jit_buffer=128M
+PHP 8.5.8 (cli) (built: Jul 14 2026 01:28:29) (NTS)
+Copyright (c) The PHP Group
+Built by https://github.com/docker-library/php
+Zend Engine v4.5.8, Copyright (c) Zend Technologies
+    with Zend OPcache v8.5.8, Copyright (c), by Zend Technologies
+[php -i] auto_globals_jit => On => On
+[php -i] PCRE JIT Support => enabled
+[php -i] PCRE JIT Target => x86 64bit (little endian + unaligned)
+[php -i] pcre.jit => On => On
+[php -i] JIT => On
+[php -i] opcache.enable => On => On
+[php -i] opcache.enable_cli => On => On
+[php -i] opcache.enable_file_override => Off => Off
+[php -i] opcache.jit => tracing => tracing
+[php -i] opcache.jit_bisect_limit => 0 => 0
+[php -i] opcache.jit_blacklist_root_trace => 16 => 16
+[php -i] opcache.jit_blacklist_side_trace => 8 => 8
+[php -i] opcache.jit_buffer_size => 128M => 128M
+[php -i] opcache.jit_debug => 0 => 0
+[php -i] opcache.jit_hot_func => 127 => 127
+[php -i] opcache.jit_hot_loop => 61 => 61
+[php -i] opcache.jit_hot_return => 8 => 8
+[php -i] opcache.jit_hot_side_exit => 8 => 8
+[php -i] opcache.jit_max_exit_counters => 8192 => 8192
+[php -i] opcache.jit_max_loop_unrolls => 8 => 8
+[php -i] opcache.jit_max_polymorphic_calls => 2 => 2
+[php -i] opcache.jit_max_recursive_calls => 2 => 2
+[php -i] opcache.jit_max_recursive_returns => 2 => 2
+[php -i] opcache.jit_max_root_traces => 1024 => 1024
+[php -i] opcache.jit_max_side_traces => 128 => 128
+[php -i] opcache.jit_max_trace_length => 1024 => 1024
+[php -i] opcache.jit_prof_threshold => 0.005 => 0.005
+[thin-bench] RUNS=30  SWEEP="1 50 500"  script=bench/thin_script.php
+
+FILES=1     OFF=   0.039 ms  ON=   0.070 ms  speedup=0.56x  saved=-0.031 ms
+FILES=50    OFF=   0.719 ms  ON=   1.000 ms  speedup=0.72x  saved=-0.281 ms
+FILES=500   OFF=   7.033 ms  ON=  12.453 ms  speedup=0.56x  saved=-5.420 ms

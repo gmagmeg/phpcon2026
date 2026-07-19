@@ -6,7 +6,7 @@ name: Benchmark (native amd64)
 #
 # 計測対象はスライドの分類に合わせて 3 ジョブに分割している:
 #   standard … 標準関数（in_array/isset・bcmath・callback）
-#   laravel  … Laravel 層（Eloquent 属性・コンテナ解決・Collection/Str・OPcache boot/thin）
+#   laravel  … Laravel 層（Eloquent 属性・コンテナ解決・Collection/Str・OPcache thin/capacity）
 #   ddd      … DDD 層（Money/VO・Transfer/Cart フロー・多態 dispatch）
 
 on:
@@ -51,7 +51,7 @@ jobs:
               benchmarks/CollectionBench.php
               benchmarks/CollectionHotLoopBench.php
               benchmarks/StrBench.php
-            shell: "bench/laravel_boot_bench.sh bench/thin_bench.sh"
+            shell: "bench/thin_bench.sh"
           # ── DDD：型付き VO / ドメインロジック / 多態 ──
           - category: ddd
             benches: >-
@@ -126,7 +126,7 @@ jobs:
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           done
 
-      - name: Run shell benchmarks (OPcache boot / thin scripts)
+      - name: Run shell benchmarks (OPcache thin scripts)
         if: matrix.shell != ''
         env:
           IMG: performance-php-app
@@ -135,7 +135,7 @@ jobs:
           set -euo pipefail
 
           # bench/ 配下はスクリプト内で OPcache OFF/ON を自前で切り替える別系統
-          # （§2「OPcache の効くケース／薄いスクリプト」の計測）。
+          # （§2「薄いスクリプト」の計測）。Laravel boot は専用 Workflow で実行する。
           # phpbench の 3 モードループには乗せず、そのまま実行して要約に貼る。
           run_sh () {   # $1=スクリプトパス
             local script="$1"
@@ -156,3 +156,21 @@ jobs:
           for SH in $SHELL_BENCHES; do
             run_sh "$SH"
           done
+
+      - name: Run OPcache dependency / capacity benchmark
+        if: matrix.category == 'laravel'
+        env:
+          IMG: performance-php-app
+        run: |
+          set -euo pipefail
+          {
+            echo ""
+            echo "## OPcache dependency / capacity — native amd64"
+            echo ""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          sh bench/opcache_capacity_bench.sh "$IMG" 30 5 400 \
+            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
